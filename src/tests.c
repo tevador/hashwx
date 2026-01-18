@@ -1,0 +1,163 @@
+/* Copyright (c) 2020-2026 tevador <tevador@gmail.com> */
+/* See LICENSE for licensing information */
+
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+#include <hashwx.h>
+#include <assert.h>
+#include <stdbool.h>
+#include <inttypes.h>
+#include <stdio.h>
+
+typedef bool test_func();
+
+static int test_no = 0;
+
+static hashwx_ctx* ctx_int = NULL;
+static hashwx_ctx* ctx_cmp = NULL;
+
+static const uint8_t seed1[32] = "This is a test seed for hashwx";
+static const uint8_t seed2[32] = "Lorem ipsum dolor sit amet";
+
+static const uint64_t counter1 = 0;
+static const uint64_t counter2 = 123456;
+static const uint64_t counter3 = 987654321123456789;
+
+static const uint64_t hash1 = 0x25b8322c168eb917;
+static const uint64_t hash2 = 0xda9af078fab4ceae;
+static const uint64_t hash3 = 0xc6dfda9e544b6401;
+static const uint64_t hash4 = 0x3bebb437a8fd7419;
+
+#define RUN_TEST(x) run_test(#x, &x)
+
+static void run_test(const char* name, test_func* func) {
+    printf("[%2i] %-40s ... ", ++test_no, name);
+    printf(func() ? "PASSED\n" : "SKIPPED\n");
+}
+
+static bool test_alloc() {
+    ctx_int = hashwx_alloc(HASHWX_INTERPRETED);
+    assert(ctx_int != NULL && ctx_int != HASHWX_NOTSUPP);
+    return true;
+}
+
+static bool test_make1() {
+    hashwx_make(ctx_int, seed1);
+    return true;
+}
+
+static bool test_hash1() {
+    uint64_t hash = hashwx_exec(ctx_int, counter1);
+    assert(hash == hash1);
+    return true;
+}
+
+static bool test_hash2() {
+    uint64_t hash = hashwx_exec(ctx_int, counter2);
+    assert(hash == hash2);
+    return true;
+}
+
+static bool test_make2() {
+    hashwx_make(ctx_int, seed2);
+    return true;
+}
+
+static bool test_hash3() {
+    uint64_t hash = hashwx_exec(ctx_int, counter2);
+    assert(hash == hash3);
+    return true;
+}
+
+static bool test_hash4() {
+    uint64_t hash = hashwx_exec(ctx_int, counter3);
+    assert(hash == hash4);
+    return true;
+}
+
+static bool test_compiler_alloc() {
+    ctx_cmp = hashwx_alloc(HASHWX_COMPILED);
+    assert(ctx_cmp != NULL);
+    return ctx_cmp != HASHWX_NOTSUPP;
+}
+
+static bool test_compiler_make1() {
+    if (ctx_cmp == HASHWX_NOTSUPP)
+        return false;
+
+    hashwx_make(ctx_cmp, seed1);
+    return true;
+}
+
+static bool test_compiler_hash1() {
+    if (ctx_cmp == HASHWX_NOTSUPP)
+        return false;
+
+    uint64_t hash = hashwx_exec(ctx_cmp, counter1);
+    assert(hash == hash1);
+    return true;
+}
+
+static bool test_compiler_hash2() {
+    if (ctx_cmp == HASHWX_NOTSUPP)
+        return false;
+
+    uint64_t hash = hashwx_exec(ctx_cmp, counter2);
+    assert(hash == hash2);
+    return true;
+}
+
+static bool test_compiler_make2() {
+    if (ctx_cmp == HASHWX_NOTSUPP)
+        return false;
+
+    hashwx_make(ctx_cmp, seed2);
+    return true;
+}
+
+static bool test_compiler_hash3() {
+    if (ctx_cmp == HASHWX_NOTSUPP)
+        return false;
+
+    uint64_t hash = hashwx_exec(ctx_cmp, counter2);
+    assert(hash == hash3);
+    return true;
+}
+
+static bool test_compiler_hash4() {
+    if (ctx_cmp == HASHWX_NOTSUPP)
+        return false;
+
+    uint64_t hash = hashwx_exec(ctx_cmp, counter3);
+    assert(hash == hash4);
+    return true;
+}
+
+static bool test_free() {
+    hashwx_free(ctx_int);
+    hashwx_free(ctx_cmp);
+    return true;
+}
+
+int main() {
+    RUN_TEST(test_alloc);
+    RUN_TEST(test_make1);
+    RUN_TEST(test_hash1);
+    RUN_TEST(test_hash2);
+    RUN_TEST(test_make2);
+    RUN_TEST(test_hash3);
+    RUN_TEST(test_hash4);
+    RUN_TEST(test_compiler_alloc);
+    RUN_TEST(test_compiler_make1);
+    RUN_TEST(test_compiler_hash1);
+    RUN_TEST(test_compiler_hash2);
+    RUN_TEST(test_compiler_make2);
+    RUN_TEST(test_compiler_hash3);
+    RUN_TEST(test_compiler_hash4);
+    RUN_TEST(test_free);
+
+    printf("\nAll tests were successful\n");
+    return 0;
+}
