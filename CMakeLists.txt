@@ -22,6 +22,14 @@ src/program_exec.c
 src/siphash_rng.c
 src/virtual_memory.c)
 
+include(CheckIncludeFile)
+set(CMAKE_C_STANDARD 11)
+
+check_include_file(threads.h HAVE_THREADS_H)
+if (HAVE_THREADS_H)
+  add_definitions(-DHASHWX_THREADS)
+endif()
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
   message(STATUS "Setting default build type: ${CMAKE_BUILD_TYPE}")
@@ -36,14 +44,12 @@ if (NOT DEFINED EMSCRIPTEN)
     include/)
   target_compile_definitions(hashwx PRIVATE HASHWX_SHARED)
   set_target_properties(hashwx PROPERTIES VERSION ${HASHWX_VERSION_STR}
-                                          SOVERSION ${HASHWX_VERSION}
-                                          C_STANDARD 11)
+                                          SOVERSION ${HASHWX_VERSION})
   # hashwx.a for static linking
   add_library(hashwx_static STATIC ${hashwx_sources})
     set_property(TARGET hashwx_static PROPERTY POSITION_INDEPENDENT_CODE ON)
     target_compile_definitions(hashwx_static PRIVATE HASHWX_STATIC)
-    set_target_properties(hashwx_static PROPERTIES OUTPUT_NAME hashwx
-                                                   C_STANDARD 11)
+    set_target_properties(hashwx_static PROPERTIES OUTPUT_NAME hashwx)
   # for make install
   include(GNUInstallDirs)
   install(TARGETS hashwx hashwx_static
@@ -57,7 +63,6 @@ else()
     include/)
   set_target_properties(hashwx PROPERTIES COMPILE_FLAGS ""
                                           LINK_FLAGS "-s MALLOC=emmalloc -s ABORTING_MALLOC=0 -s EXPORTED_FUNCTIONS=['_hashwx_alloc','_hashwx_make','_hashwx_exec','_hashwx_free','_hashwx_seed','_hashwx_registers','_hashwx_memory','_hashwx_module','_hashwx_module_size','_hashwx_exec_begin','_hashwx_exec_final'] --no-entry"
-                                          C_STANDARD 11
                                           SUFFIX ".wasm")
 endif()
 
@@ -68,7 +73,6 @@ include_directories(hashwx-tests
 
 if (NOT DEFINED EMSCRIPTEN)
   target_compile_definitions(hashwx-tests PRIVATE HASHWX_STATIC)
-  set_property(TARGET hashwx-tests PROPERTY C_STANDARD 11)
   target_link_libraries(hashwx-tests
     PRIVATE hashwx_static)
 else()
@@ -90,13 +94,11 @@ include_directories(hashwx-bench
 
 if (NOT DEFINED EMSCRIPTEN)
   target_compile_definitions(hashwx-bench PRIVATE HASHWX_STATIC)
-  set_property(TARGET hashwx-bench PROPERTY C_STANDARD 11)
   target_link_libraries(hashwx-bench
     PRIVATE hashwx_static
     PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 else()
   set_target_properties(hashwx-bench PROPERTIES
-    C_STANDARD 11
     LINK_FLAGS "--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/js/hashwx.js --js-library ${CMAKE_CURRENT_SOURCE_DIR}/js/hashwx-em.js")
 endif()
 

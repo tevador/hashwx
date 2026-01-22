@@ -8,7 +8,11 @@
 #include <hashwx.h>
 #include <limits.h>
 #include <inttypes.h>
+#if defined(HASHWX_THREADS)
 #include <threads.h>
+#else
+typedef int thrd_t;
+#endif
 
 typedef struct worker_job {
     int id;
@@ -67,6 +71,12 @@ int main(int argc, char** argv) {
     read_int_option("--nonces", argc, argv, &nonces, 65536);
     read_int_option("--threads", argc, argv, &threads, 1);
     read_option("--interpret", argc, argv, &interpret);
+#if !defined(HASHWX_THREADS)
+    if (threads > 1) {
+        printf("Error: Your compiler doesn't support C11 threads.\n");
+        return 1;
+    }
+#endif
     hashwx_type flags = HASHWX_INTERPRETED;
     if (!interpret) {
         flags = HASHWX_COMPILED;
@@ -103,6 +113,7 @@ int main(int argc, char** argv) {
     }
     time_start = platform_wall_clock();
     if (threads > 1) {
+#if defined(HASHWX_THREADS)
         for (int thd = 0; thd < threads; ++thd) {
             int res = thrd_create(&jobs[thd].thread , &worker, &jobs[thd]);
             if (res != thrd_success) {
@@ -113,6 +124,7 @@ int main(int argc, char** argv) {
         for (int thd = 0; thd < threads; ++thd) {
             thrd_join(jobs[thd].thread, NULL);
         }
+#endif
     }
     else {
         worker(jobs);
