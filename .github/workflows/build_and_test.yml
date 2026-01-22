@@ -46,10 +46,15 @@ jobs:
       - name: Build & test (emulated)
         if: matrix.arch != 'x86_64'
         run: |
-          docker run --rm -v "$PWD:/src" -w /src \
+          docker run --rm \
             --platform=linux/${{ matrix.arch }} \
-            gcc:latest \
+            -v "$PWD:/src" \
+            -w /src \
+            debian:bookworm \
             bash -c "
+              apt-get update &&
+              apt-get install -y --no-install-recommends \
+                build-essential cmake &&
               cmake -S . -B build &&
               cmake --build build &&
               ./build/hashwx-tests
