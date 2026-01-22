@@ -50,11 +50,8 @@ jobs:
             --platform=linux/${{ matrix.arch }} \
             -v "$PWD:/src" \
             -w /src \
-            debian:bookworm \
+            kitware/cmake:latest \
             bash -c "
-              apt-get update &&
-              apt-get install -y --no-install-recommends \
-                build-essential cmake &&
               cmake -S . -B build &&
               cmake --build build &&
               ./build/hashwx-tests
