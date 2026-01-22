@@ -1,0 +1,112 @@
+name: Build & test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  # =========================
+  # Linux (native + emulated)
+  # =========================
+  linux:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86
+          - x86_64
+          - armv7
+          - aarch64
+          - riscv64
+          - s390x
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Native x86_64 build
+      - name: Build & test (native)
+        if: matrix.arch == 'x86_64'
+        run: |
+          cmake -S . -B build
+          cmake --build build
+          ./build/hashwx-tests
+
+      # Emulated builds
+      - name: Set up QEMU
+        if: matrix.arch != 'x86_64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Build & test (emulated)
+        if: matrix.arch != 'x86_64'
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src \
+            --platform=linux/${{ matrix.arch }} \
+            gcc:latest \
+            bash -c "
+              cmake -S . -B build &&
+              cmake --build build &&
+              ./build/hashwx-tests
+            "
+
+  # ==========
+  # macOS
+  # ==========
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build & test
+        run: |
+          cmake -S . -B build
+          cmake --build build
+          ./build/hashwx-tests
+
+  # ======================
+  # Windows (MSVC + GCC)
+  # ======================
+  windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        compiler: [ msvc, gcc ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # MSVC
+      - name: Configure (MSVC)
+        if: matrix.compiler == 'msvc'
+        run: cmake -S . -B build -G "Visual Studio 17 2022"
+
+      - name: Build (MSVC)
+        if: matrix.compiler == 'msvc'
+        run: cmake --build build --config Release
+
+      - name: Run tests (MSVC)
+        if: matrix.compiler == 'msvc'
+        run: .\build\Release\hashwx-tests.exe
+
+      # GCC (MinGW)
+      - name: Install MinGW
+        if: matrix.compiler == 'gcc'
+        run: choco install mingw -y
+
+      - name: Configure (GCC)
+        if: matrix.compiler == 'gcc'
+        run: cmake -S . -B build -G "MinGW Makefiles"
+
+      - name: Build (GCC)
+        if: matrix.compiler == 'gcc'
+        run: cmake --build build
+
+      - name: Run tests (GCC)
+        if: matrix.compiler == 'gcc'
+        run: .\build\hashwx-tests.exe
