@@ -18,19 +18,18 @@ jobs:
       fail-fast: false
       matrix:
         arch:
-          - x86
-          - x86_64
-          - armv7
+          - 386
+          - amd64
+          - arm/v7
           - aarch64
-          - riscv64
           - s390x
 
     steps:
       - uses: actions/checkout@v4
 
-      # Native x86_64 build
+      # Native amd64 build
       - name: Build & test (native)
-        if: matrix.arch == 'x86_64'
+        if: matrix.arch == 'amd64'
         run: |
           cmake -S . -B build
           cmake --build build
@@ -38,20 +37,23 @@ jobs:
 
       # Emulated builds
       - name: Set up QEMU
-        if: matrix.arch != 'x86_64'
+        if: matrix.arch != 'amd64'
         uses: docker/setup-qemu-action@v3
         with:
           platforms: all
 
       - name: Build & test (emulated)
-        if: matrix.arch != 'x86_64'
+        if: matrix.arch != 'amd64'
         run: |
           docker run --rm \
             --platform=linux/${{ matrix.arch }} \
             -v "$PWD:/src" \
             -w /src \
-            kitware/cmake:latest \
+            debian:bookworm \
             bash -c "
+              apt-get update &&
+              apt-get install -y --no-install-recommends \
+                build-essential cmake &&
               cmake -S . -B build &&
               cmake --build build &&
               ./build/hashwx-tests
