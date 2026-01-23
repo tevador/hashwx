@@ -114,3 +114,25 @@ jobs:
       - name: Run tests (GCC)
         if: matrix.compiler == 'gcc'
         run: .\build\hashwx-tests.exe
+
+  # =================================
+  # WebAssembly (Emscripten + NodeJS)
+  # =================================
+  wasm:
+    name: WebAssembly
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build & test (Emscripten)
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            emscripten/emsdk:latest \
+            bash -c "
+              emcmake cmake -S . -B build &&
+              cmake --build build &&
+              node build/hashwx-tests.js
+            "
