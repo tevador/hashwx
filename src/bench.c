@@ -38,7 +38,6 @@ static int worker(void* args) {
     job->total_hashes = 0;
     job->best_hash = UINT64_MAX;
     job->hash_sum = 0;
-    uint8_t seed_bytes[32];
     for (int seed = job->start; seed < job->end; seed += job->step) {
         siphash_rng gen;
         hashwx_rng_init(&gen, &worker_key, seed);

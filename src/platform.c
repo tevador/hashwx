@@ -18,7 +18,7 @@ double platform_wall_clock(void) {
         if (!QueryPerformanceFrequency(&freq_long)) {
             return 0;
         }
-        freq = freq_long.QuadPart;
+        freq = (double)freq_long.QuadPart;
     }
     LARGE_INTEGER time;
     if (!QueryPerformanceCounter(&time)) {

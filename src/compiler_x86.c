@@ -145,7 +145,7 @@ static inline uint8_t* emit_op_imm(uint8_t* pos, uint32_t tpl, uint32_t dst, uin
     return pos;
 }
 
-static inline uint8_t* emit_op_reg_4d(uint8_t* pos, uint16_t tpl, uint16_t dst, uint16_t src) {
+static inline uint8_t* emit_op_reg_4d(uint8_t* pos, uint16_t tpl, uint32_t dst, uint32_t src) {
     EMIT_BYTE(pos, 0x4d);
     tpl |= dst << 8;
     tpl |= src << 11;
@@ -153,7 +153,7 @@ static inline uint8_t* emit_op_reg_4d(uint8_t* pos, uint16_t tpl, uint16_t dst, 
     return pos;
 }
 
-static inline uint8_t* emit_op_reg_4c(uint8_t* pos, uint16_t tpl, uint16_t dst, uint16_t src) {
+static inline uint8_t* emit_op_reg_4c(uint8_t* pos, uint16_t tpl, uint32_t dst, uint32_t src) {
     EMIT_BYTE(pos, 0x4c);
     tpl |= dst << 8;
     tpl |= src << 11;

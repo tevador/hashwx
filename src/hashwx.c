@@ -42,7 +42,6 @@ uint64_t hashwx_exec(const hashwx_ctx* ctx, uint64_t input) {
     assert(ctx->has_program);
     uint64_t r[HASHWX_REG_SIZE];
     //init registers
-    const siphash_key* key = &ctx->key;
     siphash_rng gen;
     hashwx_rng_init(&gen, &ctx->key, input);
     for (uint64_t i = 0; i < 8; ++i) {

@@ -340,7 +340,7 @@ void hashwx_compile_a64(uint8_t* code, const hashwx_program_list* program_list) 
     EMIT(pos, code_epilogue);
     hashwx_vm_rx(code, HASHWX_CODE_SIZE);
 #ifdef __GNUC__
-    __builtin___clear_cache(code, pos);
+    __builtin___clear_cache((char*)code, (char*)pos);
 #endif
 }
 

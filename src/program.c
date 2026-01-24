@@ -20,12 +20,12 @@
 #define NUM_ARX_OPCODES 8
 
 /* Immediates for the MUL family of instructions */
-const static uint8_t mul_imms[NUM_MUL_IMMS] = {
+static const uint8_t mul_imms[NUM_MUL_IMMS] = {
     1, 5, 17, 65
 };
 
 /* Lookup table for the ARX opcodes */
-const static instr_type arx_lookup[NUM_ARX_OPCODES] = {
+static const instr_type arx_lookup[NUM_ARX_OPCODES] = {
     INSTR_ARXSUB,
     INSTR_ARXADD,
     INSTR_ARXSUB,
@@ -36,7 +36,7 @@ const static instr_type arx_lookup[NUM_ARX_OPCODES] = {
     INSTR_ARXLSR
 };
 
-const static uint8_t src_lookup[NUM_SRC_PERM][8] = {
+static const uint8_t src_lookup[NUM_SRC_PERM][8] = {
     { 0, 3, 1, 4, 5, 6, 7, 2 }, { 0, 3, 1, 4, 6, 7, 5, 2 },
     { 0, 3, 1, 4, 7, 6, 5, 2 }, { 0, 3, 4, 1, 5, 6, 7, 2 },
     { 0, 3, 4, 1, 6, 7, 5, 2 }, { 0, 3, 4, 1, 7, 6, 5, 2 },
@@ -461,7 +461,7 @@ static void program_generate(siphash_rng* gen, hashwx_program* program) {
 
 void hashwx_program_list_generate(const siphash_key* key, hashwx_program_list* program_list) {
     siphash_rng gen;
-    hashwx_rng_init(&gen, key, -1);
+    hashwx_rng_init(&gen, key, (uint64_t)-1);
     for (int i = 0; i < HASHWX_NUM_PROGRAMS; ++i) {
         program_generate(&gen, &program_list->prog[i]);
     }

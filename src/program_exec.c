@@ -13,6 +13,7 @@ static FORCE_INLINE uint64_t rotr64(uint64_t a, unsigned int b) {
 static uint32_t program_execute_reg(const hashwx_program* program, uint64_t r[], uint32_t branch_counter) {
     uint32_t branch_flag = 0;
     uint32_t ic = 0;
+    uint64_t temp;
     for (;;) { /* loop is exited via the HALT instruction below */
         const instruction* instr = &program->code[ic];
         ic++;
@@ -31,7 +32,9 @@ static uint32_t program_execute_reg(const hashwx_program* program, uint64_t r[],
             r[instr->dst] = (r[instr->dst] | instr->imm) * r[instr->src];
             break;
         case INSTR_RMCG:
-            branch_flag = r[instr->dst] = rotr64(r[8] * r[instr->dst], instr->imm);
+            temp = rotr64(r[8] * r[instr->dst], instr->imm);
+            r[instr->dst] = temp;
+            branch_flag = (uint32_t)temp;
             break;
         case INSTR_ARXSUB:
             r[instr->dst] = rotr64(r[instr->dst], instr->imm) - r[instr->src];
@@ -66,6 +69,7 @@ static uint32_t program_execute_reg(const hashwx_program* program, uint64_t r[],
 static uint32_t program_execute_mem(const hashwx_program* program, uint64_t r[], uint32_t branch_counter, uint64_t mem[]) {
     uint32_t branch_flag = 0;
     uint32_t ic = 0;
+    uint64_t temp;
     for (;;) { /* loop is exited via the HALT instruction below */
         const instruction* instr = &program->code[ic];
         ic++;
@@ -84,7 +88,9 @@ static uint32_t program_execute_mem(const hashwx_program* program, uint64_t r[],
             r[instr->dst] = (r[instr->dst] | instr->imm) * mem[(r[instr->src] / 8) % 256];
             break;
         case INSTR_RMCG:
-            branch_flag = r[instr->dst] = rotr64(r[8] * r[instr->dst], instr->imm);
+            temp = rotr64(r[8] * r[instr->dst], instr->imm);
+            r[instr->dst] = temp;
+            branch_flag = (uint32_t)temp;
             break;
         case INSTR_ARXSUB:
             r[instr->dst] = rotr64(r[instr->dst], instr->imm) - mem[(r[instr->src] / 8) % 256];

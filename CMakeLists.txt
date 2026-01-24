@@ -1,7 +1,7 @@
 # Copyright (c) 2020-2026 tevador <tevador@gmail.com>
 # See LICENSE for licensing information
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 
 set(HASHWX_VERSION 1)
 set(HASHWX_VERSION_MINOR 0)
@@ -26,8 +26,11 @@ include(CheckIncludeFile)
 set(CMAKE_C_STANDARD 11)
 
 check_include_file(threads.h HAVE_THREADS_H)
-if (HAVE_THREADS_H)
-  add_definitions(-DHASHWX_THREADS)
+
+if (MSVC)
+  add_compile_options(/W4)
+else()
+  add_compile_options(-Wall -Wextra -pedantic)
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -94,6 +97,9 @@ include_directories(hashwx-bench
 
 if (NOT DEFINED EMSCRIPTEN)
   target_compile_definitions(hashwx-bench PRIVATE HASHWX_STATIC)
+  if (HAVE_THREADS_H)
+    target_compile_definitions(hashwx-bench PRIVATE HASHWX_THREADS)
+  endif()
   target_link_libraries(hashwx-bench
     PRIVATE hashwx_static
     PRIVATE ${CMAKE_THREAD_LIBS_INIT})
