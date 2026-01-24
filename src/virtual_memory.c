@@ -63,6 +63,7 @@ void hashwx_vm_rx(void* ptr, size_t bytes) {
 
 void hashwx_vm_free(void* ptr, size_t bytes) {
 #ifdef HASHWX_WIN
+    (void)bytes;
     VirtualFree(ptr, 0, MEM_RELEASE);
 #else
     munmap(ptr, bytes);

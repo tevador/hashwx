@@ -87,6 +87,7 @@ const uint8_t* hashwx_module(const hashwx_ctx* ctx) {
 }
 
 uint32_t hashwx_module_size(const hashwx_ctx* ctx) {
+    (void)ctx;
     return HASHWX_CODE_SIZE;
 }
 
@@ -94,7 +95,6 @@ void hashwx_exec_begin(hashwx_ctx* ctx, uint64_t input) {
     assert(ctx != NULL && ctx != HASHWX_NOTSUPP);
     assert(ctx->has_program);
     //init registers
-    const siphash_key* key = &ctx->key;
     siphash_rng gen;
     hashwx_rng_init(&gen, &ctx->key, input);
     uint64_t* r = ctx->reg;

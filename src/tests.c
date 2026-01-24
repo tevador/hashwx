@@ -11,7 +11,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 
-typedef bool test_func();
+typedef bool test_func(void);
 
 static int test_no = 0;
 
@@ -37,53 +37,53 @@ static void run_test(const char* name, test_func* func) {
     printf(func() ? "PASSED\n" : "SKIPPED\n");
 }
 
-static bool test_alloc() {
+static bool test_alloc(void) {
     ctx_int = hashwx_alloc(HASHWX_INTERPRETED);
     assert(ctx_int != NULL && ctx_int != HASHWX_NOTSUPP);
     return true;
 }
 
-static bool test_make1() {
+static bool test_make1(void) {
     hashwx_make(ctx_int, seed1);
     return true;
 }
 
-static bool test_hash1() {
+static bool test_hash1(void) {
     uint64_t hash = hashwx_exec(ctx_int, counter1);
     assert(hash == hash1);
     return true;
 }
 
-static bool test_hash2() {
+static bool test_hash2(void) {
     uint64_t hash = hashwx_exec(ctx_int, counter2);
     assert(hash == hash2);
     return true;
 }
 
-static bool test_make2() {
+static bool test_make2(void) {
     hashwx_make(ctx_int, seed2);
     return true;
 }
 
-static bool test_hash3() {
+static bool test_hash3(void) {
     uint64_t hash = hashwx_exec(ctx_int, counter2);
     assert(hash == hash3);
     return true;
 }
 
-static bool test_hash4() {
+static bool test_hash4(void) {
     uint64_t hash = hashwx_exec(ctx_int, counter3);
     assert(hash == hash4);
     return true;
 }
 
-static bool test_compiler_alloc() {
+static bool test_compiler_alloc(void) {
     ctx_cmp = hashwx_alloc(HASHWX_COMPILED);
     assert(ctx_cmp != NULL);
     return ctx_cmp != HASHWX_NOTSUPP;
 }
 
-static bool test_compiler_make1() {
+static bool test_compiler_make1(void) {
     if (ctx_cmp == HASHWX_NOTSUPP)
         return false;
 
@@ -91,7 +91,7 @@ static bool test_compiler_make1() {
     return true;
 }
 
-static bool test_compiler_hash1() {
+static bool test_compiler_hash1(void) {
     if (ctx_cmp == HASHWX_NOTSUPP)
         return false;
 
@@ -100,7 +100,7 @@ static bool test_compiler_hash1() {
     return true;
 }
 
-static bool test_compiler_hash2() {
+static bool test_compiler_hash2(void) {
     if (ctx_cmp == HASHWX_NOTSUPP)
         return false;
 
@@ -109,7 +109,7 @@ static bool test_compiler_hash2() {
     return true;
 }
 
-static bool test_compiler_make2() {
+static bool test_compiler_make2(void) {
     if (ctx_cmp == HASHWX_NOTSUPP)
         return false;
 
@@ -117,7 +117,7 @@ static bool test_compiler_make2() {
     return true;
 }
 
-static bool test_compiler_hash3() {
+static bool test_compiler_hash3(void) {
     if (ctx_cmp == HASHWX_NOTSUPP)
         return false;
 
@@ -126,7 +126,7 @@ static bool test_compiler_hash3() {
     return true;
 }
 
-static bool test_compiler_hash4() {
+static bool test_compiler_hash4(void) {
     if (ctx_cmp == HASHWX_NOTSUPP)
         return false;
 
@@ -135,13 +135,13 @@ static bool test_compiler_hash4() {
     return true;
 }
 
-static bool test_free() {
+static bool test_free(void) {
     hashwx_free(ctx_int);
     hashwx_free(ctx_cmp);
     return true;
 }
 
-int main() {
+int main(void) {
     RUN_TEST(test_alloc);
     RUN_TEST(test_make1);
     RUN_TEST(test_hash1);

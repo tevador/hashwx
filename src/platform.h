@@ -13,6 +13,7 @@
 #pragma warning(error: 4090) /* different const qualifiers */
 #pragma warning(error: 4133) /* incompatible pointer types */
 #pragma warning(disable: 4146) /* unary minus applied to unsigned type */
+#pragma warning(disable: 4127) /* conditional expression is constant */
 #endif
 
 static_assert(~0 == -1, "Only two's complement signed integers are supported");
