@@ -197,29 +197,35 @@ static uint8_t code_branch[] = {
     OP_END,         /* end */
 };
 
-static const uint8_t lookup_pre[10] = {
-    OP_SUB_64,
-    OP_ADD_64,
-    OP_XOR,
+static const uint8_t lookup_pre[13] = {
     OP_OR,
+    OP_XOR,
+    OP_ADD_64,
     OP_INVALID,
     OP_ROR,
     OP_ROR,
     OP_ROR,
     OP_SHRS,
+    OP_SHRS,
+    OP_SHRS,
+    OP_SHRU,
+    OP_SHRU,
     OP_SHRU
 };
 
-static const uint8_t lookup_post[10] = {
-    OP_MUL,
+static const uint8_t lookup_post[13] = {
     OP_MUL,
     OP_MUL,
     OP_MUL,
     OP_INVALID,
-    OP_SUB_64,
     OP_ADD_64,
+    OP_SUB_64,
     OP_XOR,
+    OP_ADD_64,
+    OP_SUB_64,
     OP_XOR,
+    OP_ADD_64,
+    OP_SUB_64,
     OP_XOR
 };
 
@@ -230,10 +236,9 @@ static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* code
         const instruction* instr = &program->code[i];
         switch (instr->opcode)
         {
-        case INSTR_MULSUB:
-        case INSTR_MULADD:
-        case INSTR_MULXOR:
         case INSTR_MULOR:
+        case INSTR_MULXOR:
+        case INSTR_MULADD:
         {
             //11 bytes
             EMIT_BYTE(pos, OP_GET); /* local.get $rd */
@@ -266,11 +271,15 @@ static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* code
             EMIT_BYTE(pos, LOC_BF);
             break;
         }
-        case INSTR_ARXSUB:
-        case INSTR_ARXADD:
-        case INSTR_ARXROR:
-        case INSTR_ARXASR:
-        case INSTR_ARXLSR:
+        case INSTR_XORROR:
+        case INSTR_ADDROR:
+        case INSTR_SUBROR:
+        case INSTR_XORASR:
+        case INSTR_ADDASR:
+        case INSTR_SUBASR:
+        case INSTR_XORLSR:
+        case INSTR_ADDLSR:
+        case INSTR_SUBLSR:
         {
             // 10 bytes
             EMIT_BYTE(pos, OP_GET); /* local.get $rd */
@@ -326,10 +335,9 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* code
         const instruction* instr = &program->code[i];
         switch (instr->opcode)
         {
-        case INSTR_MULSUB:
-        case INSTR_MULADD:
-        case INSTR_MULXOR:
         case INSTR_MULOR:
+        case INSTR_MULXOR:
+        case INSTR_MULADD:
         {
             //21 bytes
             pos = emit_mem_src(pos, instr->src);
@@ -361,11 +369,15 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* code
             EMIT_BYTE(pos, LOC_BF);
             break;
         }
-        case INSTR_ARXSUB:
-        case INSTR_ARXADD:
-        case INSTR_ARXROR:
-        case INSTR_ARXASR:
-        case INSTR_ARXLSR:
+        case INSTR_XORROR:
+        case INSTR_ADDROR:
+        case INSTR_SUBROR:
+        case INSTR_XORASR:
+        case INSTR_ADDASR:
+        case INSTR_SUBASR:
+        case INSTR_XORLSR:
+        case INSTR_ADDLSR:
+        case INSTR_SUBLSR:
         {
             // 20 bytes
             EMIT_BYTE(pos, OP_GET); /* local.get $rd */

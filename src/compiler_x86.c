@@ -114,6 +114,30 @@ static const uint8_t code_clear_bc[] = {
     0x31, 0xf6 /* xor esi, esi */
 };
 
+static const uint32_t tpl_mul[] = {
+    0x00c88349, /* or */
+    0x00f08349, /* xor */
+    0x00c08349  /* add */
+};
+
+static const uint32_t tpl_pre_xas[] = {
+    0x00c8c149, /* ror */
+    0x00f8c149, /* sar */
+    0x00e8c149  /* shr */
+};
+
+static const uint16_t tpl_xas_reg[] = {
+    0xc031, /* xor */
+    0xc001, /* add */
+    0xc029  /* sub */
+};
+
+static const uint32_t tpl_xas_mem[] = {
+    0x1404334c, /* xor */
+    0x1404034c, /* add */
+    0x14042b4c  /* sub */
+};
+
 static inline uint8_t* emit_imul_reg_4c(uint8_t* pos, uint32_t dst, uint32_t src) {
     uint32_t tpl = 0xc0af0f4c;
     tpl |= src << 24;
@@ -188,36 +212,15 @@ static uint8_t* compile_program_reg(const hashwx_program * program, uint8_t* pos
     uint8_t* target = NULL;
     for (int i = 0; i < HASHWX_PROGRAM_SIZE; ++i) {
         const instruction* instr = &program->code[i];
-        switch (instr->opcode)
+        instr_type opcode = instr->opcode;
+        switch (opcode)
         {
-        case INSTR_MULSUB:
-        {
-            /* sub dst, imm */
-            pos = emit_op_imm(pos, 0x00e88349, instr->dst, instr->imm);
-            /* imul dst, src */
-            pos = emit_imul_reg_4d(pos, instr->dst, instr->src);
-            break;
-        }
+        case INSTR_MULOR:
+        case INSTR_MULXOR:
         case INSTR_MULADD:
         {
-            /* add dst, imm */
-            pos = emit_op_imm(pos, 0x00c08349, instr->dst, instr->imm);
-            /* imul dst, src */
-            pos = emit_imul_reg_4d(pos, instr->dst, instr->src);
-            break;
-        }
-        case INSTR_MULXOR:
-        {
-            /* xor dst, imm */
-            pos = emit_op_imm(pos, 0x00f08349, instr->dst, instr->imm);
-            /* imul dst, src */
-            pos = emit_imul_reg_4d(pos, instr->dst, instr->src);
-            break;
-        }
-        case INSTR_MULOR:
-        {
-            /* or dst, imm */
-            pos = emit_op_imm(pos, 0x00c88349, instr->dst, instr->imm);
+            /* or/xor/add dst, imm */
+            pos = emit_op_imm(pos, tpl_mul[opcode], instr->dst, instr->imm);
             /* imul dst, src */
             pos = emit_imul_reg_4d(pos, instr->dst, instr->src);
             break;
@@ -234,44 +237,21 @@ static uint8_t* compile_program_reg(const hashwx_program * program, uint8_t* pos
             pos = emit_op_reg_4c(pos, 0xc089, 0, instr->dst);
             break;
         }
-        case INSTR_ARXSUB:
+        case INSTR_XORROR:
+        case INSTR_ADDROR:
+        case INSTR_SUBROR:
+        case INSTR_XORASR:
+        case INSTR_ADDASR:
+        case INSTR_SUBASR:
+        case INSTR_XORLSR:
+        case INSTR_ADDLSR:
+        case INSTR_SUBLSR:
         {
-            /* ror dst, imm */
-            pos = emit_op_imm(pos, 0x00c8c149, instr->dst, instr->imm);
-            /* sub dst, src */
-            pos = emit_op_reg_4d(pos, 0xc029, instr->dst, instr->src);
-            break;
-        }
-        case INSTR_ARXADD:
-        {
-            /* ror dst, imm */
-            pos = emit_op_imm(pos, 0x00c8c149, instr->dst, instr->imm);
-            /* add dst, src */
-            pos = emit_op_reg_4d(pos, 0xc001, instr->dst, instr->src);
-            break;
-        }
-        case INSTR_ARXROR:
-        {
-            /* ror dst, imm */
-            pos = emit_op_imm(pos, 0x00c8c149, instr->dst, instr->imm);
-            /* xor dst, src */
-            pos = emit_op_reg_4d(pos, 0xc031, instr->dst, instr->src);
-            break;
-        }
-        case INSTR_ARXASR:
-        {
-            /* sar dst, imm */
-            pos = emit_op_imm(pos, 0x00f8c149, instr->dst, instr->imm);
-            /* xor dst, src */
-            pos = emit_op_reg_4d(pos, 0xc031, instr->dst, instr->src);
-            break;
-        }
-        case INSTR_ARXLSR:
-        {
-            /* shr dst, imm */
-            pos = emit_op_imm(pos, 0x00e8c149, instr->dst, instr->imm);
-            /* xor dst, src */
-            pos = emit_op_reg_4d(pos, 0xc031, instr->dst, instr->src);
+            opcode -= 4;
+            /* ror/sar/shr dst, imm */
+            pos = emit_op_imm(pos, tpl_pre_xas[opcode / 3], instr->dst, instr->imm);
+            /* xor/add/sub dst, src */
+            pos = emit_op_reg_4d(pos, tpl_xas_reg[opcode % 3], instr->dst, instr->src);
             break;
         }
         case INSTR_BRANCH:
@@ -294,50 +274,17 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
     uint8_t* target = NULL;
     for (int i = 0; i < HASHWX_PROGRAM_SIZE; ++i) {
         const instruction* instr = &program->code[i];
-        switch (instr->opcode)
+        instr_type opcode = instr->opcode;
+        switch (opcode)
         {
-        case INSTR_MULSUB:
-        {
-            /* mov rdx, src */
-            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
-            /* sub dst, imm */
-            pos = emit_op_imm(pos, 0x00e88349, instr->dst, instr->imm);
-            /* and edx, ebp */
-            EMIT(pos, code_address);
-            /* imul dst, qword ptr [rsp+rdx] */
-            pos = emit_imul_mem(pos, instr->dst);
-            break;
-        }
+        case INSTR_MULOR:
+        case INSTR_MULXOR:
         case INSTR_MULADD:
         {
             /* mov rdx, src */
             pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
-            /* add dst, imm */
-            pos = emit_op_imm(pos, 0x00c08349, instr->dst, instr->imm);
-            /* and edx, ebp */
-            EMIT(pos, code_address);
-            /* imul dst, qword ptr [rsp+rdx] */
-            pos = emit_imul_mem(pos, instr->dst);
-            break;
-        }
-        case INSTR_MULXOR:
-        {
-            /* mov rdx, src */
-            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
-            /* xor dst, imm */
-            pos = emit_op_imm(pos, 0x00f08349, instr->dst, instr->imm);
-            /* and edx, ebp */
-            EMIT(pos, code_address);
-            /* imul dst, qword ptr [rsp+rdx] */
-            pos = emit_imul_mem(pos, instr->dst);
-            break;
-        }
-        case INSTR_MULOR:
-        {
-            /* mov rdx, src */
-            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
-            /* or dst, imm */
-            pos = emit_op_imm(pos, 0x00c88349, instr->dst, instr->imm);
+            /* or/xor/add dst, imm */
+            pos = emit_op_imm(pos, tpl_mul[opcode], instr->dst, instr->imm);
             /* and edx, ebp */
             EMIT(pos, code_address);
             /* imul dst, qword ptr [rsp+rdx] */
@@ -356,64 +303,25 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
             pos = emit_op_reg_4c(pos, 0xc089, 0, instr->dst);
             break;
         }
-        case INSTR_ARXSUB:
+        case INSTR_XORROR:
+        case INSTR_ADDROR:
+        case INSTR_SUBROR:
+        case INSTR_XORASR:
+        case INSTR_ADDASR:
+        case INSTR_SUBASR:
+        case INSTR_XORLSR:
+        case INSTR_ADDLSR:
+        case INSTR_SUBLSR:
         {
+            opcode -= 4;
             /* mov rdx, src */
             pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
-            /* ror dst, imm */
-            pos = emit_op_imm(pos, 0x00c8c149, instr->dst, instr->imm);
+            /* ror/sar/shr dst, imm */
+            pos = emit_op_imm(pos, tpl_pre_xas[opcode / 3], instr->dst, instr->imm);
             /* and edx, ebp */
             EMIT(pos, code_address);
-            /* sub dst, qword ptr [rsp+rdx] */
-            pos = emit_op_mem(pos, 0x14042b4c, instr->dst);
-            break;
-        }
-        case INSTR_ARXADD:
-        {
-            /* mov rdx, src */
-            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
-            /* ror dst, imm */
-            pos = emit_op_imm(pos, 0x00c8c149, instr->dst, instr->imm);
-            /* and edx, ebp */
-            EMIT(pos, code_address);
-            /* add dst, qword ptr [rsp+rdx] */
-            pos = emit_op_mem(pos, 0x1404034c, instr->dst);
-            break;
-        }
-        case INSTR_ARXROR:
-        {
-            /* mov rdx, src */
-            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
-            /* ror dst, imm */
-            pos = emit_op_imm(pos, 0x00c8c149, instr->dst, instr->imm);
-            /* and edx, ebp */
-            EMIT(pos, code_address);
-            /* xor dst, qword ptr [rsp+rdx] */
-            pos = emit_op_mem(pos, 0x1404334c, instr->dst);
-            break;
-        }
-        case INSTR_ARXASR:
-        {
-            /* mov rdx, src */
-            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
-            /* sar dst, imm */
-            pos = emit_op_imm(pos, 0x00f8c149, instr->dst, instr->imm);
-            /* and edx, ebp */
-            EMIT(pos, code_address);
-            /* xor dst, qword ptr [rsp+rdx] */
-            pos = emit_op_mem(pos, 0x1404334c, instr->dst);
-            break;
-        }
-        case INSTR_ARXLSR:
-        {
-            /* mov rdx, src */
-            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
-            /* shr dst, imm */
-            pos = emit_op_imm(pos, 0x00e8c149, instr->dst, instr->imm);
-            /* and edx, ebp */
-            EMIT(pos, code_address);
-            /* xor dst, qword ptr [rsp+rdx] */
-            pos = emit_op_mem(pos, 0x1404334c, instr->dst);
+            /* xor/add/sub dst, qword ptr [rsp+rdx] */
+            pos = emit_op_mem(pos, tpl_xas_mem[opcode % 3], instr->dst);
             break;
         }
         case INSTR_BRANCH:

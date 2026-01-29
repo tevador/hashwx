@@ -114,11 +114,10 @@ static const uint8_t mul_imm_inv[17] = {
     0, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
 };
 
-static const uint32_t premul_tpls[4][4] = {
-    { 0xd1000400, 0xd1001400, 0xd1004400, 0xd1010400 }, /* sub */
-    { 0x91000400, 0x91001400, 0x91004400, 0x91010400 }, /* add */
-    { 0xd2400000, 0xca0a0000, 0xca0b0000, 0xca0c0000 }, /* eor */
+static const uint32_t premul_tpls[3][4] = {
     { 0xb2400000, 0xaa0a0000, 0xaa0b0000, 0xaa0c0000 }, /* orr */
+    { 0xd2400000, 0xca0a0000, 0xca0b0000, 0xca0c0000 }, /* eor */
+    { 0x91000400, 0x91001400, 0x91004400, 0x91010400 }, /* add */
 };
 
 static const uint32_t store_pair[7] = {
@@ -139,31 +138,27 @@ static uint8_t* emit_premul(uint8_t* pos, const instruction* isn) {
     return pos;
 }
 
-static uint8_t* emit_prearx(uint8_t* pos, const instruction* isn) {
-    switch (isn->opcode) {
-    case INSTR_ARXSUB:
-    case INSTR_ARXADD:
-    case INSTR_ARXROR:
+static uint8_t* emit_pre_xas(uint8_t* pos, const instruction* isn) {
+    switch ((isn->opcode - 4) / 3) {
+    case 0:
         return emit_ror(pos, isn->dst, isn->imm);
-    case INSTR_ARXASR:
+    case 1:
         return emit_asr(pos, isn->dst, isn->imm);
-    case INSTR_ARXLSR:
+    case 2:
         return emit_lsr(pos, isn->dst, isn->imm);
     default:
         UNREACHABLE;
     }
 }
 
-static uint8_t* emit_arx(uint8_t* pos, const instruction* isn, uint32_t src) {
-    switch (isn->opcode) {
-    case INSTR_ARXSUB:
-        return emit_sub(pos, isn->dst, src);
-    case INSTR_ARXADD:
-        return emit_add(pos, isn->dst, src);
-    case INSTR_ARXROR:
-    case INSTR_ARXASR:
-    case INSTR_ARXLSR:
+static uint8_t* emit_xas(uint8_t* pos, const instruction* isn, uint32_t src) {
+    switch ((isn->opcode - 4) % 3) {
+    case 0:
         return emit_eor(pos, isn->dst, src);
+    case 1:
+        return emit_add(pos, isn->dst, src);
+    case 2:
+        return emit_sub(pos, isn->dst, src);
     default:
         UNREACHABLE;
     }
@@ -194,33 +189,33 @@ static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* pos)
     uint8_t* target = pos;
     /* mul dst0, dst0, x13 */
     pos = emit_mul(pos, program->code[0].dst, 13);
-    /* ror/lsr/asr dst1, dst1, imm1 */
-    pos = emit_prearx(pos, &program->code[1]);
+    /* ror/asr/lsr dst1, dst1, imm1 */
+    pos = emit_pre_xas(pos, &program->code[1]);
     /* mov x14, src1 */
     pos = emit_mov(pos, 14, program->code[1].src);
-    /* sub/add/eor/orr dst2, dst2, imm2 */
+    /* orr/eor/add dst2, dst2, imm2 */
     pos = emit_premul(pos, &program->code[2]);
-    /* sub/add/eor dst1, dst1, x14 */
-    pos = emit_arx(pos, &program->code[1], 14);
+    /* eor/add/sub dst1, dst1, x14 */
+    pos = emit_xas(pos, &program->code[1], 14);
     /* mul dst2, dst2, src2 */
     pos = emit_mul(pos, program->code[2].dst, program->code[2].src);
-    /* ror/lsr/asr dst3, dst3, imm3 */
-    pos = emit_prearx(pos, &program->code[3]);
+    /* ror/asr/lsr dst3, dst3, imm3 */
+    pos = emit_pre_xas(pos, &program->code[3]);
     /* ror dst0, dst0, imm0 */
     pos = emit_ror(pos, program->code[0].dst, program->code[0].imm);
-    /* sub/add/eor dst3, dst3, src3 */
-    pos = emit_arx(pos, &program->code[3], program->code[3].src);
-    /* sub/add/eor/orr dst4, dst4, imm4 */
+    /* eor/add/sub dst3, dst3, src3 */
+    pos = emit_xas(pos, &program->code[3], program->code[3].src);
+    /* orr/eor/add dst4, dst4, imm4 */
     pos = emit_premul(pos, &program->code[4]);
     /* mul dst4, dst4, src4 */
     pos = emit_mul(pos, program->code[4].dst, program->code[4].src);
-    /* ror/lsr/asr dst5, dst5, imm5 */
-    pos = emit_prearx(pos, &program->code[5]);
+    /* ror/asr/lsr dst5, dst5, imm5 */
+    pos = emit_pre_xas(pos, &program->code[5]);
     /* orr x14, dst0, x9 */
     pos = emit_orr(pos, 14, program->code[0].dst, 9);
-    /* sub/add/eor dst5, dst5, src5 */
-    pos = emit_arx(pos, &program->code[5], program->code[5].src);
-    /* sub/add/eor/orr dst6, dst6, imm6 */
+    /* eor/add/sub dst5, dst5, src5 */
+    pos = emit_xas(pos, &program->code[5], program->code[5].src);
+    /* orr/eor/add dst6, dst6, imm6 */
     pos = emit_premul(pos, &program->code[6]);
     /*
         tst x14, 32
@@ -234,12 +229,12 @@ static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* pos)
     uint32_t pair_idx = program->code[8].dst / 2;
     /* stp reg0, reg1, [sp, #pos0] */
     EMIT_ISN(pos, store_pair[pair_idx]);
-    /* ror/lsr/asr dst8, dst8, imm8 */
-    pos = emit_prearx(pos, &program->code[8]);
+    /* ror/asr/lsr dst8, dst8, imm8 */
+    pos = emit_pre_xas(pos, &program->code[8]);
     /* stp reg2, reg3, [sp, #pos1] */
     EMIT_ISN(pos, store_pair[pair_idx + 1]);
-    /* sub/add/eor dst8, dst8, src8 */
-    pos = emit_arx(pos, &program->code[8], program->code[8].src);
+    /* eor/add/sub dst8, dst8, src8 */
+    pos = emit_xas(pos, &program->code[8], program->code[8].src);
     /* stp reg4, reg5, [sp, #pos2] */
     EMIT_ISN(pos, store_pair[pair_idx + 2]);
     /* stp reg6, reg7, [sp, #pos3] */
@@ -253,12 +248,12 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
     pos = emit_and_2040(pos, 15, program->code[1].src);
     /* ldr x15, [sp, x15] */
     pos = emit_ldr_sp(pos, 15);
-    /* ror/lsr/asr dst1, dst1, imm1 */
-    pos = emit_prearx(pos, &program->code[1]);
+    /* ror/asr/lsr dst1, dst1, imm1 */
+    pos = emit_pre_xas(pos, &program->code[1]);
     /* mul dst0, dst0, x13 */
     pos = emit_mul(pos, program->code[0].dst, 13);
-    /* sub/add/eor dst1, dst1, x15 */
-    pos = emit_arx(pos, &program->code[1], 15);
+    /* eor/add/sub dst1, dst1, x15 */
+    pos = emit_xas(pos, &program->code[1], 15);
     /* and x16, src2, 2040 */
     pos = emit_and_2040(pos, 16, program->code[2].src);
     /* ldr x16, [sp, x16] */
@@ -267,16 +262,16 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
     pos = emit_and_2040(pos, 17, program->code[3].src);
     /* ldr x17, [sp, x17] */
     pos = emit_ldr_sp(pos, 17);
-    /* sub/add/eor/orr dst2, dst2, imm2 */
+    /* orr/eor/add dst2, dst2, imm2 */
     pos = emit_premul(pos, &program->code[2]);
-    /* ror/lsr/asr dst3, dst3, imm3 */
-    pos = emit_prearx(pos, &program->code[3]);
+    /* ror/asr/lsr dst3, dst3, imm3 */
+    pos = emit_pre_xas(pos, &program->code[3]);
     /* ror dst0, dst0, imm0 */
     pos = emit_ror(pos, program->code[0].dst, program->code[0].imm);
     /* mul dst2, dst2, x16 */
     pos = emit_mul(pos, program->code[2].dst, 16);
-    /* sub/add/eor dst3, dst3, x17 */
-    pos = emit_arx(pos, &program->code[3], 17);
+    /* eor/add/sub dst3, dst3, x17 */
+    pos = emit_xas(pos, &program->code[3], 17);
     /* and x16, src4, 2040 */
     pos = emit_and_2040(pos, 16, program->code[4].src);
     /* ldr x16, [sp, x16] */
@@ -285,16 +280,16 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
     pos = emit_and_2040(pos, 17, program->code[5].src);
     /* ldr x17, [sp, x17] */
     pos = emit_ldr_sp(pos, 17);
-    /* sub/add/eor/orr dst4, dst4, imm4 */
+    /* orr/eor/add dst4, dst4, imm4 */
     pos = emit_premul(pos, &program->code[4]);
-    /* ror/lsr/asr dst5, dst5, imm5 */
-    pos = emit_prearx(pos, &program->code[5]);
+    /* ror/asr/lsr dst5, dst5, imm5 */
+    pos = emit_pre_xas(pos, &program->code[5]);
     /* orr x14, dst0, x9 */
     pos = emit_orr(pos, 14, program->code[0].dst, 9);
     /* mul dst4, dst4, x16 */
     pos = emit_mul(pos, program->code[4].dst, 16);
-    /* sub/add/eor dst5, dst5, x17 */
-    pos = emit_arx(pos, &program->code[5], 17);
+    /* eor/add/sub dst5, dst5, x17 */
+    pos = emit_xas(pos, &program->code[5], 17);
     /* and x16, src6, 2040 */
     pos = emit_and_2040(pos, 16, program->code[6].src);
     /* ldr x16, [sp, x16] */
@@ -303,7 +298,7 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
     pos = emit_and_2040(pos, 17, program->code[8].src);
     /* ldr x17, [sp, x17] */
     pos = emit_ldr_sp(pos, 17);
-    /* sub/add/eor/orr dst6, dst6, imm6 */
+    /* orr/eor/add dst6, dst6, imm6 */
     pos = emit_premul(pos, &program->code[6]);
     /*
         tst x14, 32
@@ -314,10 +309,10 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
     pos = emit_mul(pos, program->code[6].dst, 16);
     /* b.eq */
     pos = emit_beq(pos, target);
-    /* ror/lsr/asr dst8, dst8, imm8 */
-    pos = emit_prearx(pos, &program->code[8]);
-    /* sub/add/eor dst8, dst8, x17 */
-    pos = emit_arx(pos, &program->code[8], 17);
+    /* ror/asr/lsr dst8, dst8, imm8 */
+    pos = emit_pre_xas(pos, &program->code[8]);
+    /* eor/add/sub dst8, dst8, x17 */
+    pos = emit_xas(pos, &program->code[8], 17);
     return pos;
 }
 
