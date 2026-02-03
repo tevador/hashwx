@@ -366,7 +366,7 @@ static inline instr_type gen_xas_opcode(uint64_t select, uint32_t* select_hi) {
 }
 
 static void gen_destinations(uint32_t dst[8], const uint32_t select[7]) {
-    /* Fisher–Yates shuffle */
+    /* Fisher-Yates shuffle */
     dst[0] = 0;
     for (int i = 1; i < 8; ++i) {
         dst[i] = i;

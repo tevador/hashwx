@@ -218,15 +218,15 @@ static const uint8_t lookup_post[13] = {
     OP_MUL,
     OP_MUL,
     OP_INVALID,
-    OP_ADD_64,
-    OP_SUB_64,
     OP_XOR,
     OP_ADD_64,
     OP_SUB_64,
     OP_XOR,
     OP_ADD_64,
     OP_SUB_64,
-    OP_XOR
+    OP_XOR,
+    OP_ADD_64,
+    OP_SUB_64
 };
 
 static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* code) {
