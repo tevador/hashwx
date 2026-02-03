@@ -7,16 +7,19 @@
 #include <stdint.h>
 
 typedef enum instr_type {
-    INSTR_MULSUB,   /* subtract and multiply */
-    INSTR_MULADD,   /* add and multiply */
-    INSTR_MULXOR,   /* xor and multiply */
     INSTR_MULOR,    /* or and multiply */
+    INSTR_MULXOR,   /* xor and multiply */
+    INSTR_MULADD,   /* add and multiply */
     INSTR_RMCG,     /* rotated multiplicative congruential generator */
-    INSTR_ARXSUB,   /* rotate and subtract */
-    INSTR_ARXADD,   /* rotate and add */
-    INSTR_ARXROR,   /* rotate and xor */
-    INSTR_ARXASR,   /* arithmetic shift and xor */
-    INSTR_ARXLSR,   /* logical shift and xor */
+    INSTR_XORROR,   /* rotate and xor */
+    INSTR_ADDROR,   /* rotate and add */
+    INSTR_SUBROR,   /* rotate and subtract */
+    INSTR_XORASR,   /* arithmetic shift and xor */
+    INSTR_ADDASR,   /* arithmetic shift and add */
+    INSTR_SUBASR,   /* arithmetic shift and subtract */
+    INSTR_XORLSR,   /* logical shift and xor */
+    INSTR_ADDLSR,   /* logical shift and add */
+    INSTR_SUBLSR,   /* logical shift and subtract */
     INSTR_BRANCH,   /* conditional branch */
     INSTR_HALT,     /* halt */
 } instr_type;

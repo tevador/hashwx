@@ -14,16 +14,15 @@ However, HashX suffers from the following problems:
 
 In HashWX, we use 2 ways to prevent a loss of entropy when hashing.
 
-Firstly, multiplications are always fused with a "healing" operation that prevents accumulation of trailing zeroes in registers. In particular, an odd immediate is always added, subtracted, XORed or ORed to one of the multiplicands, which gives us the following 4 MUL* instructions:
+Firstly, multiplications are always fused with a "healing" operation that prevents accumulation of trailing zeroes in registers. In particular, an odd immediate is always ORed, XORed or added to one of the multiplicands, which gives us the following 3 MUL* instructions:
 
 |opcode|instruction|operation|dst|src|imm|
 |-|-|-|-|-|-|
-|0|MULSUB|`dst=(dst-imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|1|MULADD|`dst=(dst+imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|2|MULXOR|`dst=(dst^imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|3|MULOR|`dst=(dst\|imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
+|0|MULOR|`dst=(dst\|imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
+|1|MULXOR|`dst=(dst^imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
+|2|MULADD|`dst=(dst+imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
 
-We empirically tested that even a long sequence of one of these instructions (with random `dst`, `src` and `imm`) will on average accumulate only about 4 trailing zeroes (or 1 trailing zero in the case of MULOR).
+We empirically tested that even a long sequence of one of these instructions (with random `dst`, `src` and `imm`) will on average accumulate only about 4 trailing zeroes (for MULXOR and MULADD) or 1 trailing zero (for MULOR).
 
 Secondly, HashWX expands the 8 VM registers with an additional read-only register R8, which preserves part of the input state even if some of the registers R0-R7 lose entropy during the execution of the program.
 
@@ -57,6 +56,32 @@ HashWX uses a simplified instruction set that only includes basic operations tha
 The immediate size is limited to 7 bits to allow for efficient encoding in x86, ARM and RISC-V instruction formats.
 
 HashWX uses a variant of the [multiplicative congruential generator](https://en.wikipedia.org/wiki/Lehmer_random_number_generator) (MCG) to generate pseudorandom numbers for branching. This generator only requires two operations (a multiplication and a rotation) per output. The constant multiplier is stored in the read-only register R8 and is constructed to be 5 (mod 8) in accordance with [literature](https://dl.acm.org/doi/epdf/10.1145/321062.321065).
+
+A HashWX program in register mode consists of roughly the following sequence of x86 opcodes. If multiple opcodes are possible, the probabilities are in parentheses.
+
+```
+cmovz
+imul
+ror
+ror (1/3), sar (1/3), shr (1/3)
+add (1/3), sub (1/3), xor (1/3)
+or  (1/3), xor (1/3), add (1/3)
+imul
+ror (1/3), sar (1/3), shr (1/3)
+add (1/3), sub (1/3), xor (1/3)
+or  (1/3), xor (1/3), add (1/3)
+imul
+ror (1/3), sar (1/3), shr (1/3)
+add (1/3), sub (1/3), xor (1/3)
+or  (1/3), xor (1/3), add (1/3)
+imul
+or
+lea
+test
+jz
+ror (1/3), sar (1/3), shr (1/3)
+add (1/3), sub (1/3), xor (1/3)
+```
 
 ### Program generation
 

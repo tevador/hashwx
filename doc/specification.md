@@ -73,53 +73,65 @@ The actual source operand used by an instruction depends on the value of the Mem
 
 |opcode|instruction|operation|dst|src|imm|
 |-|-|-|-|-|-|
-|0|MULSUB|`dst=(dst-imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|1|MULADD|`dst=(dst+imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|2|MULXOR|`dst=(dst^imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|3|MULOR|`dst=(dst\|imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|4|RMCG|`dst=(dst*R8)>>>>imm;BF=dst[5];`|R0-R7||`1-63`|
-|5|ARXSUB|`dst=(dst>>>>imm)-[src]`|R0-R7|R0-R7|`1-63`|
-|6|ARXADD|`dst=(dst>>>>imm)+[src]`|R0-R7|R0-R7|`1-63`|
-|7|ARXROR|`dst=(dst>>>>imm)^[src]`|R0-R7|R0-R7|`1-63`|
-|8|ARXASR|`dst=(dst>>imm)^[src]`|R0-R7|R0-R7|`1-3`|
-|9|ARXLSR|`dst=(dst>>>imm)^[src]`|R0-R7|R0-R7|`1-3`|
-|10|BRANCH|`if(BC && !BF){BC--;PC=0;}`|||
-|11|HALT||||||
+|0|MULOR|`dst=(dst\|imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
+|1|MULXOR|`dst=(dst^imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
+|2|MULADD|`dst=(dst+imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
+|3|RMCG|`dst=(dst*R8)>>>>imm;BF=dst[5];`|R0-R7||`1-63`|
+|4|XORROR|`dst=(dst>>>>imm)^[src]`|R0-R7|R0-R7|`1-63`|
+|5|ADDROR|`dst=(dst>>>>imm)+[src]`|R0-R7|R0-R7|`1-63`|
+|6|SUBROR|`dst=(dst>>>>imm)-[src]`|R0-R7|R0-R7|`1-63`|
+|7|XORASR|`dst=(dst>>imm)^[src]`|R0-R7|R0-R7|`1-3`|
+|8|ADDASR|`dst=(dst>>imm)+[src]`|R0-R7|R0-R7|`1-3`|
+|9|SUBASR|`dst=(dst>>imm)-[src]`|R0-R7|R0-R7|`1-3`|
+|10|XORLSR|`dst=(dst>>>imm)^[src]`|R0-R7|R0-R7|`1-3`|
+|11|ADDLSR|`dst=(dst>>>imm)+[src]`|R0-R7|R0-R7|`1-3`|
+|12|SUBLSR|`dst=(dst>>>imm)-[src]`|R0-R7|R0-R7|`1-3`|
+|13|BRANCH|`if(BC && !BF){BC--;PC=0;}`|||
+|14|HALT||||||
 
-##### 1.4.2.1 MULSUB
-This instruction subtracts the immediate value from the destination register, multiplies it by the source operand and stores the result in the destination register.
-
-##### 1.4.2.2 MULADD
-This instruction adds the immediate value to the destination register, multiplies it by the source operand and stores the result in the destination register.
-
-##### 1.4.2.3 MULXOR
-This instruction performs a bitwise XOR of the destination register with the immediate value, multiplies it by the source operand and stores the result in the destination register.
-
-##### 1.4.2.4 MULOR
+##### 1.4.2.1 MULOR
 This instruction performs a bitwise OR of the destination register with the immediate value, multiplies it by the source operand and stores the result in the destination register.
 
-##### 1.4.2.5 RMCG
+##### 1.4.2.2 MULXOR
+This instruction performs a bitwise XOR of the destination register with the immediate value, multiplies it by the source operand and stores the result in the destination register.
+
+##### 1.4.2.3 MULADD
+This instruction adds the immediate value to the destination register, multiplies it by the source operand and stores the result in the destination register.
+
+##### 1.4.2.4 RMCG
 This instruction multiplies the destination register by R8 and rotates the result by the immediate count. The result is written to the destination register and bit number 5 (zero-indexed from LSB) of the destination is copied to the Branch flag.
 
-##### 1.4.2.6 ARXSUB
-This instruction rotates the destination register to the right by the immediate count, subtracts the source operand and stores the result in the destination register.
-
-##### 1.4.2.7 ARXADD
-This instruction rotates the destination register to the right by the immediate count, adds the source operand and stores the result in the destination register.
-
-##### 1.4.2.8 ARXROR
+##### 1.4.2.5 XORROR
 This instruction rotates the destination register to the right by the immediate count, performs bitwise XOR with the source operand and stores the result in the destination register.
 
-##### 1.4.2.9 ARXASR
-This instruction performs an arithmetic right shift of the destination register by the immediate count. The shifted value is bitwise XORed with the source operand and the result is stored in the destination register.
+##### 1.4.2.6 ADDROR
+This instruction rotates the destination register to the right by the immediate count, adds the source operand and stores the result in the destination register.
 
-##### 1.4.2.10 ARXLSR
-This instruction performs a logical right shift of the destination register by the immediate count. The shifted value is bitwise XORed with the source operand and the result is stored in the destination register.
+##### 1.4.2.7 SUBROR
+This instruction rotates the destination register to the right by the immediate count, subtracts the source operand and stores the result in the destination register.
 
-##### 1.4.2.11 BRANCH
+##### 1.4.2.8 XORASR
+This instruction performs an arithmetic right shift of the destination register by the immediate count. The source operand is bitwise XORed with the shifted value and the result is stored in the destination register.
+
+##### 1.4.2.9 ADDASR
+This instruction performs an arithmetic right shift of the destination register by the immediate count. The source operand is added to the shifted value and the result is stored in the destination register.
+
+##### 1.4.2.10 SUBASR
+This instruction performs an arithmetic right shift of the destination register by the immediate count. The source operand is subtracted from the shifted value and the result is stored in the destination register.
+
+##### 1.4.2.11 XORLSR
+This instruction performs a logical right shift of the destination register by the immediate count. The source operand is bitwise XORed with the shifted value and the result is stored in the destination register.
+
+##### 1.4.2.12 ADDLSR
+This instruction performs a logical right shift of the destination register by the immediate count. The source operand is added to the shifted value and the result is stored in the destination register.
+
+##### 1.4.2.13 SUBLSR
+This instruction performs a logical right shift of the destination register by the immediate count. The source operand is subtracted from the shifted value and the result is stored in the destination register.
+
+##### 1.4.2.14 BRANCH
 This instruction performs a conditional branch. The branch is taken if BC is nonzero and BF is zero. If the branch is taken, the BC register is decremented by 1 and the VM jumps to the first instruction in the program buffer.
 
-##### 1.4.2.12 HALT
+##### 1.4.2.15 HALT
 This instruction stops the VM. No register values are affected.
 
 ## 2. HashWX instance generation
@@ -142,17 +154,17 @@ Each HashWX program consists of 10 instructions and has the following structure:
 |index|opcode|arguments|
 |-----|------|---------|
 |0|RMCG|dst, imm|
-|1|ARX*|dst, src, imm|
+|1|XAS*|dst, src, imm|
 |2|MUL*|dst, src, imm|
-|3|ARX*|dst, src, imm|
+|3|XAS*|dst, src, imm|
 |4|MUL*|dst, src, imm|
-|5|ARX*|dst, src, imm|
+|5|XAS*|dst, src, imm|
 |6|MUL*|dst, src, imm|
 |7|BRANCH|
-|8|ARX*|dst, src, imm|
+|8|XAS*|dst, src, imm|
 |9|HALT|
 
-MUL* refers to one of the 4 MUL opcodes (0-3) and ARX* refers to one of the 5 ARX opcodes (5-9) from table 1.4.2.
+MUL* refers to one of the 3 MUL opcodes (0-2) and XAS* refers to one of the 9 XOR/ADD/SUB opcodes (4-12) from table 1.4.2.
 
 ### 2.3 Program generation
 
@@ -160,31 +172,31 @@ Each random program is generated from 16 pseudorandom 64-bit numbers output from
 
 #### 2.3.1 Opcodes
 
-The ARX instructions at indexes 1, 3, 5 and 8 can have one of 5 possible opcodes. These opcodes are selected from the lookup table 2.3.1.1 based on the 3 least significant bits of `gen[0]`, `gen[2]`, `gen[4]` and `gen[6]`.
+The XAS instructions at indexes 1, 3, 5 and 8 can have one of 9 possible opcodes. These opcodes are selected from the lookup table 2.3.1.1 based on the least significant 32 bits of `gen[0]`, `gen[2]`, `gen[4]` and `gen[6]`.
 
-*Table 2.3.1.1 - ARX lookup table*
+*Table 2.3.1.1 - XAS lookup table*
 
-|`gen[i] & 7`|opcode|
+|`(gen[i] & 0xffffffff) % 9`|opcode|
 |-----|------|
-|0|ARXSUB|
-|1|ARXADD|
-|2|ARXSUB|
-|3|ARXADD|
-|4|ARXROR|
-|5|ARXROR|
-|6|ARXASR|
-|7|ARXLSR|
+|0|XORROR|
+|1|ADDROR|
+|2|SUBROR|
+|3|XORASR|
+|4|ADDASR|
+|5|SUBASR|
+|6|XORLSR|
+|7|ADDLSR|
+|8|SUBLSR|
 
-The MUL instructions at indexes 2, 4 and 6 can have one of 4 possible opcodes. These opcodes are selected from the lookup table 2.3.1.2 based on the 2 least significant bits of `gen[1]`, `gen[3]` and `gen[5]`.
+The MUL instructions at indexes 2, 4 and 6 can have one of 3 possible opcodes. These opcodes are selected based on the least significant 32 bits of `gen[1]`, `gen[3]` and `gen[5]` as shown in table 2.3.1.2
 
 *Table 2.3.1.2 - MUL lookup table*
 
-|`gen[i] & 3`|opcode|
+|`(gen[i] & 0xffffffff) % 3`|opcode|
 |-----|------|
-|0|MULSUB|
-|1|MULADD|
-|2|MULXOR|
-|3|MULOR|
+|0|MULOR|
+|1|MULXOR|
+|2|MULADD|
 
 #### 2.3.2 Destinations
 

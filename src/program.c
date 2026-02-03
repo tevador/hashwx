@@ -16,24 +16,25 @@
 
 #define NUM_MUL_IMMS 4
 #define NUM_SRC_PERM 625
-#define NUM_MUL_OPCODES 4
-#define NUM_ARX_OPCODES 8
+#define NUM_MUL_OPCODES 3
+#define NUM_XAS_OPCODES 9
 
 /* Immediates for the MUL family of instructions */
 static const uint8_t mul_imms[NUM_MUL_IMMS] = {
     1, 5, 17, 65
 };
 
-/* Lookup table for the ARX opcodes */
-static const instr_type arx_lookup[NUM_ARX_OPCODES] = {
-    INSTR_ARXSUB,
-    INSTR_ARXADD,
-    INSTR_ARXSUB,
-    INSTR_ARXADD,
-    INSTR_ARXROR,
-    INSTR_ARXROR,
-    INSTR_ARXASR,
-    INSTR_ARXLSR
+/* Lookup table for the XAS opcodes */
+static const instr_type xas_lookup[NUM_XAS_OPCODES] = {
+    INSTR_XORROR,
+    INSTR_ADDROR,
+    INSTR_SUBROR,
+    INSTR_XORASR,
+    INSTR_ADDASR,
+    INSTR_SUBASR,
+    INSTR_XORLSR,
+    INSTR_ADDLSR,
+    INSTR_SUBLSR
 };
 
 static const uint8_t src_lookup[NUM_SRC_PERM][8] = {
@@ -358,14 +359,14 @@ static inline instr_type gen_mul_opcode(uint64_t select, uint32_t* select_hi) {
     return (instr_type)(select_lo % NUM_MUL_OPCODES);
 }
 
-static inline instr_type gen_arx_opcode(uint64_t select, uint32_t* select_hi) {
+static inline instr_type gen_xas_opcode(uint64_t select, uint32_t* select_hi) {
     uint32_t select_lo = (uint32_t)select;
     *select_hi = (uint32_t)(select >> 32);
-    return arx_lookup[select_lo % NUM_ARX_OPCODES];
+    return xas_lookup[select_lo % NUM_XAS_OPCODES];
 }
 
 static void gen_destinations(uint32_t dst[8], const uint32_t select[7]) {
-    /* Fisher–Yates shuffle */
+    /* Fisher-Yates shuffle */
     dst[0] = 0;
     for (int i = 1; i < 8; ++i) {
         dst[i] = i;
@@ -383,10 +384,10 @@ static void gen_sources(uint32_t src[8], uint32_t dst[8], uint64_t select) {
 }
 
 static uint32_t gen_imm(instr_type opcode, uint64_t select) {
-    if (opcode <= INSTR_MULOR) {
+    if (opcode <= INSTR_MULADD) {
         return mul_imms[select % NUM_MUL_IMMS]; /* 1, 5, 17, 65 */
     }
-    if (opcode <= INSTR_ARXROR) {
+    if (opcode <= INSTR_SUBROR) {
         return 1 + (select % 63); /* 1-63 */
     }
     return 1 + (select % 3); /* 1-3 */
@@ -397,18 +398,18 @@ static void program_generate(siphash_rng* gen, hashwx_program* program) {
         The program layout is as follows:
 
         INSTR_RMCG (dst, imm)
-        INSTR_ARX (dst, src, imm)
-        INSTR_MUL (dst, src, imm)
-        INSTR_ARX (dst, src, imm)
-        INSTR_MUL (dst, src, imm)
-        INSTR_ARX (dst, src, imm)
-        INSTR_MUL (dst, src, imm)
+        INSTR_XAS* (dst, src, imm)
+        INSTR_MUL* (dst, src, imm)
+        INSTR_XAS* (dst, src, imm)
+        INSTR_MUL* (dst, src, imm)
+        INSTR_XAS* (dst, src, imm)
+        INSTR_MUL* (dst, src, imm)
         INSTR_BRANCH
-        INSTR_ARX (dst, src, imm)
+        INSTR_XAS* (dst, src, imm)
         INSTR_HALT
 
-        Here INSTR_ARX is one of the five ARX opcodes and INSTR_MUL is one
-        of the four MUL opcodes.
+        Here INSTR_XAS* is one of the nine XOR/ADD/SUB opcodes and INSTR_MUL
+        is one of the three MUL opcodes.
         The branch instruction, if taken, jumps to the start of the program.
 
         Eight instructions have a dst register. Destinations are selected
@@ -418,7 +419,7 @@ static void program_generate(siphash_rng* gen, hashwx_program* program) {
         625 permitted permutations of the destinations.
 
         For INSTR_MUL, the imm value is chosen from the set  { 1, 5, 17, 65 }.
-        For INSTR_ARXASR and INSTR_ARXLSR, the imm range is 1-3.
+        For INSTR_*ASR and INSTR_*LSR, the imm range is 1-3.
         The other instructions have an imm range of 1-63.
 
         In total, the generator calls hashwx_rng_next 16x.
@@ -428,13 +429,13 @@ static void program_generate(siphash_rng* gen, hashwx_program* program) {
 
     /* opcodes */
     program->code[0].opcode = INSTR_RMCG;
-    program->code[1].opcode = gen_arx_opcode(hashwx_rng_next(gen), &dst_select[0]);
+    program->code[1].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[0]);
     program->code[2].opcode = gen_mul_opcode(hashwx_rng_next(gen), &dst_select[1]);
-    program->code[3].opcode = gen_arx_opcode(hashwx_rng_next(gen), &dst_select[2]);
+    program->code[3].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[2]);
     program->code[4].opcode = gen_mul_opcode(hashwx_rng_next(gen), &dst_select[3]);
-    program->code[5].opcode = gen_arx_opcode(hashwx_rng_next(gen), &dst_select[4]);
+    program->code[5].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[4]);
     program->code[6].opcode = gen_mul_opcode(hashwx_rng_next(gen), &dst_select[5]);
-    program->code[7].opcode = gen_arx_opcode(hashwx_rng_next(gen), &dst_select[6]);
+    program->code[7].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[6]);
 
     /* instruction destination registers */
     uint32_t dst[8];
