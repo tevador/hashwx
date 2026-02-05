@@ -82,3 +82,9 @@ A benchmark executable is included:
 WebAssembly offers about 70% of native performance thanks to the built-in compiler that builds a dynamic module for each generated hash function. HashWX is therefore well-suited for browser-based CAPTCHA-like client puzzles.
 
 To build a WASM module, install Emscripten and use `emcmake cmake ..` instead of `cmake ..`.
+
+For in-browser use, it's recommended to increase the number of attempts per hash function from 512 to 65536 due to higher compilation overhead.
+
+```
+node hashwx-bench.js --seeds 100 --nonces 65536
+```

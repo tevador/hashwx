@@ -49,7 +49,7 @@ static int worker(void* args) {
                 job->best_hash = hashval;
             }
             if (hashval < job->threshold) {
-                printf("[thread %2i] Hash (%5i, %5i) below threshold: %" PRIu64,
+                printf("[thread %2i] Hash (%5i, %5i) below threshold: %016" PRIx64 "\n",
                     job->id,
                     seed,
                     nonce,
