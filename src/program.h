@@ -13,7 +13,7 @@
 
 #define HASHWX_PROGRAM_SIZE 10
 #define HASHWX_NUM_PROGRAMS 32
-#define HASHWX_REG_SIZE 9
+#define HASHWX_REG_SIZE 10
 #define HASHWX_MEM_SIZE 256
 
 typedef struct hashwx_program {

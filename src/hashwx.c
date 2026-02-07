@@ -47,9 +47,10 @@ uint64_t hashwx_exec(const hashwx_ctx* ctx, uint64_t input) {
     for (uint64_t i = 0; i < 8; ++i) {
         r[i] = hashwx_rng_next(&gen);
     }
-    uint64_t r8 = r[r[0] % 8];
-    //adjust R8 to be 5 mod 8
-    r[8] = (r8 & -8) | 5;
+    //adjust R8 to be 3 mod 8
+    r[8] = (r[4] & -8) | 3;
+    //adjust R9 to be 5 mod 8
+    r[9] = (r[7] & -8) | 5;
     //execute
 #ifndef HASHWX_COMPILER_WASM
     if (ctx->type & HASHWX_COMPILED) {
@@ -63,7 +64,7 @@ uint64_t hashwx_exec(const hashwx_ctx* ctx, uint64_t input) {
     //finalize
     SIPROUND(r[0], r[1], r[2], r[3]);
     SIPROUND(r[4], r[5], r[6], r[7]);
-    return r[3] ^ r[7] ^ r[8];
+    return r[3] ^ r[7] ^ r[9];
 }
 
 #ifdef HASHWX_COMPILER_WASM
@@ -101,9 +102,10 @@ void hashwx_exec_begin(hashwx_ctx* ctx, uint64_t input) {
     for (uint64_t i = 0; i < 8; ++i) {
         r[i] = hashwx_rng_next(&gen);
     }
-    uint64_t r8 = r[r[0] % 8];
-    //adjust R8 to be 5 mod 8
-    r[8] = (r8 & -8) | 5;
+    //adjust R8 to be 3 mod 8
+    r[8] = (r[4] & -8) | 3;
+    //adjust R9 to be 5 mod 8
+    r[9] = (r[7] & -8) | 5;
 }
 
 uint64_t hashwx_exec_final(const hashwx_ctx* ctx) {
@@ -116,11 +118,11 @@ uint64_t hashwx_exec_final(const hashwx_ctx* ctx) {
     uint64_t r5 = r[5];
     uint64_t r6 = r[6];
     uint64_t r7 = r[7];
-    uint64_t r8 = r[8];
+    uint64_t r9 = r[9];
     //finalize
     SIPROUND(r0, r1, r2, r3);
     SIPROUND(r4, r5, r6, r7);
-    return r3 ^ r7 ^ r8;
+    return r3 ^ r7 ^ r9;
 }
 
 #endif

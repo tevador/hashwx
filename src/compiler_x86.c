@@ -23,14 +23,14 @@
 
 /*
     x86 achitectural register allocation:
-        rax    = BF, temporary
+        rax    = temporary
         rcx    = in/out ptr
-        rdx    = temporary
-        rbx    = R8
-        rbp    = 2040
+        rdx    = BF, temporary
+        rbx    = 32-BC
         rsp    = stack/memory ptr
-        rsi    = 32-BC
-        rdi    = 32-(BC-1)
+        rbp    = 32-(BC-1)
+        rsi    = R8
+        rdi    = R9
         r8-r15 = R0-R7
 */
 
@@ -55,10 +55,10 @@ static const uint8_t code_prologue[] = {
     0x4c, 0x8b, 0x69, 0x28, /* mov r13, qword ptr [rcx+40] */
     0x4c, 0x8b, 0x71, 0x30, /* mov r14, qword ptr [rcx+48] */
     0x4c, 0x8b, 0x79, 0x38, /* mov r15, qword ptr [rcx+56] */
-    0x48, 0x8b, 0x59, 0x40, /* mov rbx, qword ptr [rcx+64] */
-    0xbd, 0xf8, 0x07, 0x00, 0x00, /* mov ebp, 2040 */
-    0x31, 0xf6, /* xor esi, esi */
-    0x8d, 0x7e, 0x01 /* lea edi, [rsi+1] */
+    0x48, 0x8b, 0x71, 0x40, /* mov rsi, qword ptr [rcx+64] */
+    0x48, 0x8b, 0x79, 0x48, /* mov rdi, qword ptr [rcx+72] */
+    0x31, 0xdb, /* xor ebx, ebx */
+    0x8d, 0x6b, 0x01 /* lea ebp, [rbx+1] */
 };
 
 static const uint8_t code_epilogue[] = {
@@ -85,14 +85,14 @@ static const uint8_t code_epilogue[] = {
 };
 
 static const uint8_t code_target[] = {
-    0x85, 0xff, /* test edi, edi */
-    0x0f, 0x44, 0xf7 /* cmovz esi, edi */
+    0x85, 0xed, /* test ebp, ebp */
+    0x0f, 0x44, 0xdd /* cmovz ebx, ebp */
 };
 
 static const uint8_t code_branch[] = {
-    0x09, 0xf0, /* or eax, esi */
-    0x8d, 0x7e, 0x01, /* lea edi, [rsi+1] */
-    0xa8, 0x20 /* test al, 32 */
+    0x09, 0xda, /* or edx, ebx */
+    0x8d, 0x6b, 0x01, /* lea ebp, [rbx+1] */
+    0xf6, 0xc2, 0x20  /* test dl, 32 */
 };
 
 static const uint8_t code_store[] = {
@@ -107,11 +107,11 @@ static const uint8_t code_store[] = {
 };
 
 static const uint8_t code_address[] = {
-    0x21, 0xea /* and edx, ebp */
+    0x25, 0xf8, 07, 00, 00 /* and eax, 2040 */
 };
 
 static const uint8_t code_clear_bc[] = {
-    0x31, 0xf6 /* xor esi, esi */
+    0x31, 0xdb /* xor ebx, ebx */
 };
 
 static const uint32_t tpl_mul[] = {
@@ -133,9 +133,9 @@ static const uint16_t tpl_xas_reg[] = {
 };
 
 static const uint32_t tpl_xas_mem[] = {
-    0x1404334c, /* xor */
-    0x1404034c, /* add */
-    0x14042b4c  /* sub */
+    0x0404334c, /* xor */
+    0x0404034c, /* add */
+    0x04042b4c  /* sub */
 };
 
 static inline uint8_t* emit_imul_reg_4c(uint8_t* pos, uint32_t dst, uint32_t src) {
@@ -156,7 +156,8 @@ static inline uint8_t* emit_imul_reg_4d(uint8_t* pos, uint32_t dst, uint32_t src
 
 static inline uint8_t* emit_imul_mem(uint8_t* pos, uint32_t dst) {
     EMIT_BYTE(pos, 0x4c);
-    uint32_t tpl = 0x1404af0f;
+    /* imul dst, qword ptr [rsp+rax] */
+    uint32_t tpl = 0x0404af0f;
     tpl |= dst << 19;
     EMIT(pos, tpl);
     return pos;
@@ -229,12 +230,12 @@ static uint8_t* compile_program_reg(const hashwx_program * program, uint8_t* pos
         {
             target = pos; /* +2 */
             EMIT(pos, code_target);
-            /* imul dst, rbx */
-            pos = emit_imul_reg_4c(pos, instr->dst, 3);
+            /* imul dst, src */
+            pos = emit_imul_reg_4c(pos, instr->dst, instr->src - 2);
             /* ror dst, imm */
             pos = emit_op_imm(pos, 0x00c8c149, instr->dst, instr->imm);
-            /* mov rax, dst */
-            pos = emit_op_reg_4c(pos, 0xc089, 0, instr->dst);
+            /* mov rdx, dst */
+            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->dst);
             break;
         }
         case INSTR_XORROR:
@@ -281,13 +282,13 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
         case INSTR_MULXOR:
         case INSTR_MULADD:
         {
-            /* mov rdx, src */
-            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
+            /* mov rax, src */
+            pos = emit_op_reg_4c(pos, 0xc089, 0, instr->src);
             /* or/xor/add dst, imm */
             pos = emit_op_imm(pos, tpl_mul[opcode], instr->dst, instr->imm);
-            /* and edx, ebp */
+            /* and eax, 2040 */
             EMIT(pos, code_address);
-            /* imul dst, qword ptr [rsp+rdx] */
+            /* imul dst, qword ptr [rsp+rax] */
             pos = emit_imul_mem(pos, instr->dst);
             break;
         }
@@ -295,12 +296,12 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
         {
             target = pos; /* +2 */
             EMIT(pos, code_target);
-            /* imul dst, rbx */
-            pos = emit_imul_reg_4c(pos, instr->dst, 3);
+            /* imul dst, src */
+            pos = emit_imul_reg_4c(pos, instr->dst, instr->src - 2);
             /* ror dst, imm */
             pos = emit_op_imm(pos, 0x00c8c149, instr->dst, instr->imm);
-            /* mov rax, dst */
-            pos = emit_op_reg_4c(pos, 0xc089, 0, instr->dst);
+            /* mov rdx, dst */
+            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->dst);
             break;
         }
         case INSTR_XORROR:
@@ -314,13 +315,13 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
         case INSTR_SUBLSR:
         {
             opcode -= 4;
-            /* mov rdx, src */
-            pos = emit_op_reg_4c(pos, 0xc089, 2, instr->src);
+            /* mov rax, src */
+            pos = emit_op_reg_4c(pos, 0xc089, 0, instr->src);
             /* ror/sar/shr dst, imm */
             pos = emit_op_imm(pos, tpl_pre_xas[opcode / 3], instr->dst, instr->imm);
-            /* and edx, ebp */
+            /* and eax, 2040 */
             EMIT(pos, code_address);
-            /* xor/add/sub dst, qword ptr [rsp+rdx] */
+            /* xor/add/sub dst, qword ptr [rsp+rax] */
             pos = emit_op_mem(pos, tpl_xas_mem[opcode % 3], instr->dst);
             break;
         }

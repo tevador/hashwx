@@ -35,9 +35,10 @@
 #define LOC_R6 0x08 /* VM register R6 */
 #define LOC_R7 0x09 /* VM register R7 */
 #define LOC_R8 0x0a /* VM register R8 */
-#define LOC_BC 0x0b /* VM register BC */
-#define LOC_BF 0x0c /* VM register BF */
-#define LOC_MM 0x0d /* memory mask constant (2040) */
+#define LOC_R9 0x0b /* VM register R9 */
+#define LOC_BC 0x0c /* VM register BC */
+#define LOC_BF 0x0d /* VM register BF */
+#define LOC_MM 0x0e /* memory mask constant (2040) */
 
 #define OP_INVALID 0x00
 #define OP_NOP 0x01
@@ -85,8 +86,8 @@ static const uint8_t code_prologue[] = {
     0x07, 0x08, 0x01,
     0x04, 'e', 'x', 'e', 'c', 0x00, 0x00,
     /* Section Code */
-    0x0a, 0x94, 0xd9, 0x00 /*11412*/, 1,
-    0x90, 0xd9, 0x00 /*11408*/, 1, 12, TYPE_I64,
+    0x0a, 0xdb, 0xd7, 0x00 /*11227*/, 1,
+    0xd7, 0xd7, 0x00 /*11223*/, 1, 13, TYPE_I64,
     OP_GET, PAR_RP, OP_LOAD, ALIGN,  0, OP_SET, LOC_R0,
     OP_GET, PAR_RP, OP_LOAD, ALIGN,  8, OP_SET, LOC_R1,
     OP_GET, PAR_RP, OP_LOAD, ALIGN, 16, OP_SET, LOC_R2,
@@ -96,6 +97,7 @@ static const uint8_t code_prologue[] = {
     OP_GET, PAR_RP, OP_LOAD, ALIGN, 48, OP_SET, LOC_R6,
     OP_GET, PAR_RP, OP_LOAD, ALIGN, 56, OP_SET, LOC_R7,
     OP_GET, PAR_RP, OP_LOAD, ALIGN, 64, OP_SET, LOC_R8,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN, 72, OP_SET, LOC_R9,
     OP_CONST_64, 0, OP_SET, LOC_BC,
     OP_CONST_64, 0xf8, 0x0f /*2040*/, OP_SET, LOC_MM,
     OP_CONST_32, 0x80, 0x10 /*2048*/, OP_GET, PAR_MP, OP_ADD_32, OP_SET, PAR_MP
@@ -240,12 +242,11 @@ static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* code
         case INSTR_MULXOR:
         case INSTR_MULADD:
         {
-            //11 bytes
+            //10 bytes
             EMIT_BYTE(pos, OP_GET); /* local.get $rd */
             EMIT_BYTE(pos, LOC_R0 + instr->dst);
             EMIT_BYTE(pos, OP_CONST_64); /* i64.const imm */
-            EMIT_BYTE(pos, instr->imm | 0x80);
-            EMIT_BYTE(pos, 0x00);
+            EMIT_BYTE(pos, instr->imm);
             EMIT_BYTE(pos, lookup_pre[instr->opcode]); /* i64.op */
             EMIT_BYTE(pos, OP_GET); /* local.get $rs */
             EMIT_BYTE(pos, LOC_R0 + instr->src);
@@ -259,8 +260,8 @@ static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* code
             //12 bytes
             EMIT_BYTE(pos, OP_GET); /* local.get $rd */
             EMIT_BYTE(pos, LOC_R0 + instr->dst);
-            EMIT_BYTE(pos, OP_GET);
-            EMIT_BYTE(pos, LOC_R8); /* local.get $r8 */
+            EMIT_BYTE(pos, OP_GET); /* local.get $rs */
+            EMIT_BYTE(pos, LOC_R0 + instr->src);
             EMIT_BYTE(pos, OP_MUL); /* i64.mul */
             EMIT_BYTE(pos, OP_CONST_64); /* i64.const imm */
             EMIT_BYTE(pos, instr->imm);
@@ -339,13 +340,12 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* code
         case INSTR_MULXOR:
         case INSTR_MULADD:
         {
-            //21 bytes
+            //20 bytes
             pos = emit_mem_src(pos, instr->src);
             EMIT_BYTE(pos, OP_GET); /* local.get $rd */
             EMIT_BYTE(pos, LOC_R0 + instr->dst);
-            EMIT_BYTE(pos, OP_CONST_64);
-            EMIT_BYTE(pos, instr->imm | 0x80);
-            EMIT_BYTE(pos, 0x00); /* i64.const imm */
+            EMIT_BYTE(pos, OP_CONST_64); /* i64.const imm */
+            EMIT_BYTE(pos, instr->imm);
             EMIT_BYTE(pos, lookup_pre[instr->opcode]); /* i64.op */
             EMIT_BYTE(pos, OP_MUL);
             EMIT_BYTE(pos, OP_SET); /* local.set $rd */
@@ -357,8 +357,8 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* code
             //12 bytes
             EMIT_BYTE(pos, OP_GET); /* local.get $rd */
             EMIT_BYTE(pos, LOC_R0 + instr->dst);
-            EMIT_BYTE(pos, OP_GET);
-            EMIT_BYTE(pos, LOC_R8); /* local.get $r8 */
+            EMIT_BYTE(pos, OP_GET); /* local.get $rs */
+            EMIT_BYTE(pos, LOC_R0 + instr->src);
             EMIT_BYTE(pos, OP_MUL); /* i64.mul */
             EMIT_BYTE(pos, OP_CONST_64); /* i64.const imm */
             EMIT_BYTE(pos, instr->imm);

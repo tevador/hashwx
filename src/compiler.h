@@ -35,7 +35,7 @@ HASHWX_PRIVATE void hashwx_compile_wasm(uint8_t* code, const hashwx_program_list
 #define HASHWX_COMPILER 1
 #define HASHWX_COMPILER_WASM
 #define hashwx_compile hashwx_compile_wasm
-#define HASHWX_CODE_SIZE 11463
+#define HASHWX_CODE_SIZE 11278
 #else
 #define HASHWX_COMPILER 0
 #define hashwx_compile(code, program_list)
