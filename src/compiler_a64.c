@@ -26,24 +26,23 @@
         x0-x7   = R0-R7
         x8      = in/out ptr
         x9      = 32-BC
-        x10     = 5
-        x11     = 17
-        x12     = 65
-        x13     = R8
+        x10     = 9
+        x11     = 33
+        x12     = R8
+        x13     = R9
         x14-x17 = temporary
 */
 
 static const uint8_t code_prologue[] = {
-    0x0d, 0x20, 0x40, 0xf9, /* ldr x13, [x0, #64] */
+    0x0c, 0x34, 0x44, 0xa9, /* ldp x12, x13, [x0, #64] */
     0xe8, 0x03, 0x00, 0xaa, /* mov x8, x0 */
     0x06, 0x1c, 0x43, 0xa9, /* ldp x6, x7, [x0, #48] */
     0x04, 0x14, 0x42, 0xa9, /* ldp x4, x5, [x0, #32] */
     0x02, 0x0c, 0x41, 0xa9, /* ldp x2, x3, [x0, #16] */
     0x00, 0x04, 0x40, 0xa9, /* ldp x0, x1, [x0, #0] */
     0x09, 0x00, 0x80, 0xd2, /* mov x9, 0 */
-    0xaa, 0x00, 0x80, 0xd2, /* mov x10, 5 */
-    0x2b, 0x02, 0x80, 0xd2, /* mov x11, 17 */
-    0x2c, 0x08, 0x80, 0xd2, /* mov x12, 65 */
+    0x2a, 0x01, 0x80, 0xd2, /* mov x10, 9 */
+    0x2b, 0x04, 0x80, 0xd2, /* mov x11, 33 */
 };
 
 static const uint8_t code_epilogue[] = {
@@ -109,15 +108,15 @@ static uint8_t* emit_orr(uint8_t* pos, uint32_t dst, uint32_t src1, uint32_t src
     return pos;
 }
 
- /* converts [1, 5, 17, 65] (divided by 4) to [0, 1, 2, 3] */
-static const uint8_t mul_imm_inv[17] = {
-    0, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
+ /* converts [1, 9, 33] (divided by 8) to [0, 1, 2] */
+static const uint8_t mul_imm_inv[5] = {
+    0, 1, 2, 2, 2
 };
 
-static const uint32_t premul_tpls[3][4] = {
-    { 0xb2400000, 0xaa0a0000, 0xaa0b0000, 0xaa0c0000 }, /* orr */
-    { 0xd2400000, 0xca0a0000, 0xca0b0000, 0xca0c0000 }, /* eor */
-    { 0x91000400, 0x91001400, 0x91004400, 0x91010400 }, /* add */
+static const uint32_t premul_tpls[3][3] = {
+    { 0xb2400000, 0xaa0a0000, 0xaa0b0000 }, /* orr */
+    { 0xd2400000, 0xca0a0000, 0xca0b0000 }, /* eor */
+    { 0x91000400, 0x91002400, 0x91008400 }, /* add */
 };
 
 static const uint32_t store_pair[7] = {
@@ -131,7 +130,7 @@ static const uint32_t store_pair[7] = {
 };
 
 static uint8_t* emit_premul(uint8_t* pos, const instruction* isn) {
-    uint32_t imm = mul_imm_inv[isn->imm / 4];
+    uint32_t imm = mul_imm_inv[isn->imm / 8];
     uint32_t tpl = premul_tpls[isn->opcode][imm];
     uint32_t dst = isn->dst;
     EMIT_ISN(pos, tpl | (dst << 5) | (dst));
@@ -187,8 +186,8 @@ static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* pos)
     /* sub sp, sp, 64 */
     EMIT_ISN(pos, 0xd10103ff);
     uint8_t* target = pos;
-    /* mul dst0, dst0, x13 */
-    pos = emit_mul(pos, program->code[0].dst, 13);
+    /* mul dst0, dst0, src0 */
+    pos = emit_mul(pos, program->code[0].dst, program->code[0].src + 4);
     /* ror/asr/lsr dst1, dst1, imm1 */
     pos = emit_pre_xas(pos, &program->code[1]);
     /* mov x14, src1 */
@@ -250,8 +249,8 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
     pos = emit_ldr_sp(pos, 15);
     /* ror/asr/lsr dst1, dst1, imm1 */
     pos = emit_pre_xas(pos, &program->code[1]);
-    /* mul dst0, dst0, x13 */
-    pos = emit_mul(pos, program->code[0].dst, 13);
+    /* mul dst0, dst0, src0 */
+    pos = emit_mul(pos, program->code[0].dst, program->code[0].src + 4);
     /* eor/add/sub dst1, dst1, x15 */
     pos = emit_xas(pos, &program->code[1], 15);
     /* and x16, src2, 2040 */

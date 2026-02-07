@@ -29,7 +29,7 @@ static uint32_t program_execute_reg(const hashwx_program* program, uint64_t r[],
             r[instr->dst] = (r[instr->dst] + instr->imm) * r[instr->src];
             break;
         case INSTR_RMCG:
-            temp = rotr64(r[8] * r[instr->dst], instr->imm);
+            temp = rotr64(r[instr->dst] * r[instr->src], instr->imm);
             r[instr->dst] = temp;
             branch_flag = (uint32_t)temp;
             break;
@@ -94,7 +94,7 @@ static uint32_t program_execute_mem(const hashwx_program* program, uint64_t r[],
             r[instr->dst] = (r[instr->dst] + instr->imm) * mem[(r[instr->src] / 8) % 256];
             break;
         case INSTR_RMCG:
-            temp = rotr64(r[8] * r[instr->dst], instr->imm);
+            temp = rotr64(r[instr->dst] * r[instr->src], instr->imm);
             r[instr->dst] = temp;
             branch_flag = (uint32_t)temp;
             break;

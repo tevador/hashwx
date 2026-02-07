@@ -14,14 +14,14 @@
 #define TRACE false
 #define TRACE_PRINT(...) do { if (TRACE) printf(__VA_ARGS__); } while (false)
 
-#define NUM_MUL_IMMS 4
+#define NUM_MUL_IMMS 3
 #define NUM_SRC_PERM 625
 #define NUM_MUL_OPCODES 3
 #define NUM_XAS_OPCODES 9
 
 /* Immediates for the MUL family of instructions */
 static const uint8_t mul_imms[NUM_MUL_IMMS] = {
-    1, 5, 17, 65
+    1, 9, 33
 };
 
 /* Lookup table for the XAS opcodes */
@@ -378,14 +378,15 @@ static void gen_destinations(uint32_t dst[8], const uint32_t select[7]) {
 
 static void gen_sources(uint32_t src[8], uint32_t dst[8], uint64_t select) {
     const uint8_t* src_perm = src_lookup[select % NUM_SRC_PERM];
-    for (int i = 0; i < 8; ++i) {
+    for (int i = 1; i < 8; ++i) {
         src[i] = dst[src_perm[i]];
     }
+    src[0] = 8 + (select % 2);
 }
 
 static uint32_t gen_imm(instr_type opcode, uint64_t select) {
     if (opcode <= INSTR_MULADD) {
-        return mul_imms[select % NUM_MUL_IMMS]; /* 1, 5, 17, 65 */
+        return mul_imms[select % NUM_MUL_IMMS]; /* 1, 9, 33 */
     }
     if (opcode <= INSTR_SUBROR) {
         return 1 + (select % 63); /* 1-63 */

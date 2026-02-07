@@ -20,11 +20,11 @@ Program buffer holds the program to be executed by the VM. Supported instruction
 
 ### 1.2 Registers
 
-The VM has a total of 13 registers. The first 9 registers (R0-R8) are arithmetic registers and the remaining 4 registers (PC, BC, BF, MF) are control registers and flags.
+The VM has a total of 14 registers. The first 10 registers (R0-R9) are arithmetic registers and the remaining 4 registers (PC, BC, BF, MF) are control registers and flags.
 
 #### 1.2.1 Arithmetic registers
 
-The registers R0-R8 are used for arithmetic operations. Their size is 64 bits. Registers R0-R7 are read-write registers, while R8 is a read-only register used by the `RMCG` instruction.
+The registers R0-R9 are used for arithmetic operations. Their size is 64 bits. Registers R0-R7 are read-write registers, while R8 and R9 are read-only registers used by the `RMCG` instruction.
 
 #### 1.2.2 Control registers
 
@@ -68,15 +68,16 @@ The actual source operand used by an instruction depends on the value of the Mem
 * `>>>` denotes a logical (unsigned) right shift
 * `>>>>` denotes circular right shift (rotation)
 * the source operand is evaluated as: `[src] = MF ? memory[src & 2040] : src`
+* the RMCG instruction always uses a register source operand
 
 *Table 1.4.2 - HashWX instructions*
 
 |opcode|instruction|operation|dst|src|imm|
 |-|-|-|-|-|-|
-|0|MULOR|`dst=(dst\|imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|1|MULXOR|`dst=(dst^imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|2|MULADD|`dst=(dst+imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|3|RMCG|`dst=(dst*R8)>>>>imm;BF=dst[5];`|R0-R7||`1-63`|
+|0|MULOR|`dst=(dst\|imm)*[src]`|R0-R7|R0-R7|`1,9,33`|
+|1|MULXOR|`dst=(dst^imm)*[src]`|R0-R7|R0-R7|`1,9,33`|
+|2|MULADD|`dst=(dst+imm)*[src]`|R0-R7|R0-R7|`1,9,33`|
+|3|RMCG|`dst=(dst*src)>>>>imm;BF=dst[5];`|R0-R7|R8-R9|`1-63`|
 |4|XORROR|`dst=(dst>>>>imm)^[src]`|R0-R7|R0-R7|`1-63`|
 |5|ADDROR|`dst=(dst>>>>imm)+[src]`|R0-R7|R0-R7|`1-63`|
 |6|SUBROR|`dst=(dst>>>>imm)-[src]`|R0-R7|R0-R7|`1-63`|
@@ -99,7 +100,7 @@ This instruction performs a bitwise XOR of the destination register with the imm
 This instruction adds the immediate value to the destination register, multiplies it by the source operand and stores the result in the destination register.
 
 ##### 1.4.2.4 RMCG
-This instruction multiplies the destination register by R8 and rotates the result by the immediate count. The result is written to the destination register and bit number 5 (zero-indexed from LSB) of the destination is copied to the Branch flag.
+This instruction multiplies the destination register by the source register and rotates the result by the immediate count. The result is written to the destination register and bit number 5 (zero-indexed from LSB) of the destination is copied to the Branch flag.
 
 ##### 1.4.2.5 XORROR
 This instruction rotates the destination register to the right by the immediate count, performs bitwise XOR with the source operand and stores the result in the destination register.
@@ -153,7 +154,7 @@ Each HashWX program consists of 10 instructions and has the following structure:
 
 |index|opcode|arguments|
 |-----|------|---------|
-|0|RMCG|dst, imm|
+|0|RMCG|dst, src, imm|
 |1|XAS*|dst, src, imm|
 |2|MUL*|dst, src, imm|
 |3|XAS*|dst, src, imm|
@@ -204,7 +205,16 @@ A total of 8 instructions in each program need a destination register (indexes 0
 
 #### 2.3.3 Sources
 
-A total of 7 instructions in each program need a source register (indexes 1-6 and 8). Sources are selected as one of 625 permitted permutations of the destinations. The source permutation index is calculated as `gen[7] % 625`. The permitted source permutations are listed in Appendix C.
+A total of 7 instructions in each program need a source register from the range R0-R7 (indexes 1-6 and 8). These sources are selected as one of 625 permitted permutations of the destinations. The source permutation index is calculated as `gen[7] % 625`. The permitted source permutations are listed in Appendix C.
+
+The RMCG instruction at index 0 can take either R8 or R9 as its source operand. This choice is determined by the value `gen[7] % 2` according to Table 2.3.3.1.
+
+*Table 2.3.3.1 - RMCG src register*
+
+|`gen[7] % 2`|register|
+|-----|------|
+|0|R8|
+|1|R9|
 
 #### 2.3.4 Immediates
 
@@ -225,20 +235,7 @@ The whole algorithm in pseudocode is described in Appendix D.
 
 A Siphash generator is initialized using the Siphash key from the HashWX instance and the nonce value as the salt. The first 8 random numbers from the generator are used to initialize the registers R0-R7.
 
-The register R8 is initialized based on the 3 least significant bits of R0 according to the following table:
-
-*Table 3.1.1 - R8 register initialization*
-
-|`R0 & 7`|`R8`         |
-|--------|-------------|
-| `000`  | `(R0 & -8) \| 5`|
-| `001`  | `(R1 & -8) \| 5`|
-| `010`  | `(R2 & -8) \| 5`|
-| `011`  | `(R3 & -8) \| 5`|
-| `100`  | `(R4 & -8) \| 5`|
-| `101`  | `(R5 & -8) \| 5`|
-| `110`  | `(R6 & -8) \| 5`|
-| `111`  | `(R7 & -8) \| 5`|
+The register R8 is initialized as `R8 = (R4 & -8) | 3` and the register R9 is initialized as `R9 = (R7 & -8) | 5`.
 
 ### 3.2 Memory write phase
 
@@ -250,7 +247,7 @@ At the beginning of this phase, the VM Branch counter register is reset to 32 an
 
 ### 3.4 Finalization phase
 
-The final hash value is calculated from the values of registers R0-R8 after the memory read phase. First, two SipRounds are executed to mix registers R0-R3 and R4-R7 (SipRound is described in Appendix A.1). The final hash value is `R3 ^ R7 ^ R8`.
+The final hash value is calculated from the values of registers R0-R8 after the memory read phase. First, two SipRounds are executed to mix registers R0-R3 and R4-R7 (SipRound is described in Appendix A.1). The final hash value is `R3 ^ R7 ^ R9`.
 
 ## Appendix
 
@@ -473,7 +470,8 @@ function hashwx_execute(self, nonce):
     vm = hashwx_vm()
     for i in [0..7]:
         vm.r[i] = gen.next()
-    vm.r[8] = (vm.r[vm.r0 & 7] & -8) | 5
+    vm.r[8] = (vm.r[4] & -8) | 3
+    vm.r[9] = (vm.r[7] & -8) | 5
     vm.bc = 32
     vm.mf = 0
     for i in [0..31]:
@@ -488,5 +486,5 @@ function hashwx_execute(self, nonce):
         vm.execute()
     vm.r[0], vm.r[1], vm.r[2], vm.r[3] = sipround(vm.r[0], vm.r[1], vm.r[2], vm.r[3])
     vm.r[4], vm.r[5], vm.r[6], vm.r[7] = sipround(vm.r[4], vm.r[5], vm.r[6], vm.r[7])
-    return vm.r[3] ^ vm.r[7] ^ vm.r[8]
+    return vm.r[3] ^ vm.r[7] ^ vm.r[9]
 ```

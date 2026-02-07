@@ -24,7 +24,7 @@ Firstly, multiplications are always fused with a "healing" operation that preven
 
 We empirically tested that even a long sequence of one of these instructions (with random `dst`, `src` and `imm`) will on average accumulate only about 4 trailing zeroes (for MULXOR and MULADD) or 1 trailing zero (for MULOR).
 
-Secondly, HashWX expands the 8 VM registers with an additional read-only register R8, which preserves part of the input state even if some of the registers R0-R7 lose entropy during the execution of the program.
+Secondly, HashWX expands the 8 VM registers with two additional read-only registers R8 and R9, which preserve part of the input state even if some of the registers R0-R7 lose entropy during the execution of the program.
 
 ### Branches
 
@@ -55,7 +55,7 @@ HashWX uses a simplified instruction set that only includes basic operations tha
 
 The immediate size is limited to 7 bits to allow for efficient encoding in x86, ARM and RISC-V instruction formats.
 
-HashWX uses a variant of the [multiplicative congruential generator](https://en.wikipedia.org/wiki/Lehmer_random_number_generator) (MCG) to generate pseudorandom numbers for branching. This generator only requires two operations (a multiplication and a rotation) per output. The constant multiplier is stored in the read-only register R8 and is constructed to be 5 (mod 8) in accordance with [literature](https://dl.acm.org/doi/epdf/10.1145/321062.321065).
+HashWX uses a variant of the [multiplicative congruential generator](https://en.wikipedia.org/wiki/Lehmer_random_number_generator) (MCG) to generate pseudorandom numbers for branching. This generator only requires two operations (a multiplication and a rotation) per output. The constant multipliers are stored in the read-only registers R8-R9 and are constructed to be 3 and 5 (mod 8) in accordance with [literature](https://dl.acm.org/doi/epdf/10.1145/321062.321065).
 
 A HashWX program in register mode consists of roughly the following sequence of x86 opcodes. If multiple opcodes are possible, the probabilities are in parentheses.
 
