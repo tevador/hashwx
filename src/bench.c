@@ -66,8 +66,8 @@ int main(int argc, char** argv) {
     bool interpret;
     read_int_option("--diff", argc, argv, &diff, INT_MAX);
     read_int_option("--start", argc, argv, &start, 0);
-    read_int_option("--seeds", argc, argv, &seeds, 10000);
-    read_int_option("--nonces", argc, argv, &nonces, 512);
+    read_int_option("--seeds", argc, argv, &seeds, 11000);
+    read_int_option("--nonces", argc, argv, &nonces, 463);
     read_int_option("--threads", argc, argv, &threads, 1);
     read_option("--interpret", argc, argv, &interpret);
 #if !defined(HASHWX_THREADS)

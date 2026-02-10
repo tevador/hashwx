@@ -19,7 +19,13 @@ because of the static nature of cryptographic hash functions, an attacker can
 offload hashing to a GPU or FPGA to gain a significant advantage over legitimate
 clients equipped only with a CPU.
 
-In a minimal HashWX-based protocol, the client is given a 256-bit challenge bitstring `C` and a 64-bit numeric target `T`. The client's goal is to find a 64-bit nonce `N` such that `H(N) < T`, where `H = hashwx_make(sha256(C || (n & -512)))` is a dynamically constructed hash function. Each hash function can only be used for 512 attempts before it must be discarded. This is recommended for maximum GPU resistance.
+In a minimal HashWX-based protocol, the client is given a 256-bit challenge bitstring `C` and a 64-bit numeric target `T`. The client's goal is to find a 64-bit nonce `N` such that `H(N) < T`, where
+
+```
+H = hashwx_make(sha256(C || (N / 463)))
+```
+
+is a dynamically constructed hash function. Each hash function can only be used for 463 attempts before it must be discarded. This is recommended for maximum GPU resistance.
 
 ## Design and specification
 
@@ -83,7 +89,7 @@ WebAssembly offers about 70% of native performance thanks to the built-in compil
 
 To build a WASM module, install Emscripten and use `emcmake cmake ..` instead of `cmake ..`.
 
-For in-browser use, it's recommended to increase the number of attempts per hash function from 512 to 65536 due to higher compilation overhead.
+For in-browser use, it's recommended to increase the number of attempts per hash function from 463 to 65536 due to higher compilation overhead.
 
 ```
 node hashwx-bench.js --seeds 100 --nonces 65536
