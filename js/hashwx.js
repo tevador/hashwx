@@ -1,5 +1,6 @@
-/* Copyright (c) 2020-2026 tevador <tevador@gmail.com> */
-/* See LICENSE for licensing information */
+/* Javascript glue code to be used with the hashwx.wasm binary. */
+/* Written in 2026 by tevador <tevador@gmail.com>. */
+/* Copyright waiver: This source file is released into the public domain. */
 
 class hashwx {
     #imports;
