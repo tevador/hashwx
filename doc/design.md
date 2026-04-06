@@ -18,9 +18,9 @@ Firstly, multiplications are always fused with a "healing" operation that preven
 
 |opcode|instruction|operation|dst|src|imm|
 |-|-|-|-|-|-|
-|0|MULOR|`dst=(dst\|imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|1|MULXOR|`dst=(dst^imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
-|2|MULADD|`dst=(dst+imm)*[src]`|R0-R7|R0-R7|`1,5,17,65`|
+|0|MULOR|`dst=(dst\|imm)*[src]`|R0-R7|R0-R7|`1,9,33`|
+|1|MULXOR|`dst=(dst^imm)*[src]`|R0-R7|R0-R7|`1,9,33`|
+|2|MULADD|`dst=(dst+imm)*[src]`|R0-R7|R0-R7|`1,9,33`|
 
 We empirically tested that even a long sequence of one of these instructions (with random `dst`, `src` and `imm`) will on average accumulate only about 4 trailing zeroes (for MULXOR and MULADD) or 1 trailing zero (for MULOR).
 
