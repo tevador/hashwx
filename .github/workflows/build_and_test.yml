@@ -17,12 +17,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch:
-          - 386
-          - amd64
-          - arm/v7
-          - aarch64
-          - s390x
+        include:
+          - arch: 386
+            image: debian:bookworm
+          - arch: amd64
+            image: debian:bookworm
+          - arch: arm/v7
+            image: debian:bookworm
+          - arch: aarch64
+            image: debian:bookworm
+          - arch: s390x
+            image: s390x/debian:bookworm
 
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +54,7 @@ jobs:
             --platform=linux/${{ matrix.arch }} \
             -v "$PWD:/src" \
             -w /src \
-            debian:bookworm \
+            ${{ matrix.image }} \
             bash -c "
               apt-get update &&
               apt-get install -y --no-install-recommends \
