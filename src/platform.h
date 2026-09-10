@@ -62,7 +62,7 @@ static_assert(~0 == -1, "Only two's complement signed integers are supported");
     defined(__LITTLE_ENDIAN__) || defined(__ARMEL__) || defined(__MIPSEL__) || \
     defined(__AARCH64EL__) || defined(__amd64__) || defined(__i386__) ||       \
     defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64) ||                \
-    defined(_M_ARM)
+    defined(_M_ARM) || defined(_M_ARM64)
 #define PLATFORM_LE
 #endif
 /* platforms not listed above will use endian-agnostic code */

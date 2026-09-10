@@ -44,14 +44,14 @@ if (NOT DEFINED EMSCRIPTEN)
     set_property(TARGET hashwx PROPERTY POSITION_INDEPENDENT_CODE ON)
     set_property(TARGET hashwx PROPERTY PUBLIC_HEADER include/hashwx.h)
   include_directories(hashwx
-    include/)
+    PUBLIC include/)
   target_compile_definitions(hashwx PRIVATE HASHWX_SHARED)
   set_target_properties(hashwx PROPERTIES VERSION ${HASHWX_VERSION_STR}
                                           SOVERSION ${HASHWX_VERSION})
   # hashwx.a for static linking
   add_library(hashwx_static STATIC ${hashwx_sources})
     set_property(TARGET hashwx_static PROPERTY POSITION_INDEPENDENT_CODE ON)
-    target_compile_definitions(hashwx_static PRIVATE HASHWX_STATIC)
+    target_compile_definitions(hashwx_static PUBLIC HASHWX_STATIC)
     set_target_properties(hashwx_static PROPERTIES OUTPUT_NAME hashwx)
   # for make install
   include(GNUInstallDirs)

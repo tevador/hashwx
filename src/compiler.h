@@ -29,7 +29,7 @@ HASHWX_PRIVATE void hashwx_compile_wasm(uint8_t* code, const hashwx_program_list
 #elif defined(__riscv_xlen) && __riscv_xlen == 64 && defined(__riscv_zbb)
 #define HASHWX_COMPILER 0
 #define HASHWX_COMPILER_RV64
-#define hashwx_compile
+#define hashwx_compile(code, program_list)
 #define HASHWX_CODE_SIZE 8192
 #elif defined(__wasm__)
 #define HASHWX_COMPILER 1

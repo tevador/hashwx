@@ -1,6 +1,8 @@
 /* Copyright (c) 2020-2026 tevador <tevador@gmail.com> */
 /* See LICENSE for licensing information */
 
+#define _GNU_SOURCE
+
 #include "virtual_memory.h"
 
 #ifndef __wasm__
@@ -8,7 +10,6 @@
 #if defined(HASHWX_WIN)
 #include <windows.h>
 #else
-#define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <errno.h>

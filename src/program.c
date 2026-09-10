@@ -419,7 +419,7 @@ static void program_generate(siphash_rng* gen, hashwx_program* program) {
         Seven instructions have a src register. Sources are selected from
         625 permitted permutations of the destinations.
 
-        For INSTR_MUL, the imm value is chosen from the set  { 1, 5, 17, 65 }.
+        For INSTR_MUL, the imm value is chosen from the set  { 1, 9, 33 }.
         For INSTR_*ASR and INSTR_*LSR, the imm range is 1-3.
         The other instructions have an imm range of 1-63.
 

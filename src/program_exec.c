@@ -85,13 +85,13 @@ static uint32_t program_execute_mem(const hashwx_program* program, uint64_t r[],
         switch (instr->opcode)
         {
         case INSTR_MULOR:
-            r[instr->dst] = (r[instr->dst] | instr->imm) * mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = (r[instr->dst] | instr->imm) * mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_MULXOR:
-            r[instr->dst] = (r[instr->dst] ^ instr->imm) * mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = (r[instr->dst] ^ instr->imm) * mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_MULADD:
-            r[instr->dst] = (r[instr->dst] + instr->imm) * mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = (r[instr->dst] + instr->imm) * mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_RMCG:
             temp = rotr64(r[instr->dst] * r[instr->src], instr->imm);
@@ -99,31 +99,31 @@ static uint32_t program_execute_mem(const hashwx_program* program, uint64_t r[],
             branch_flag = (uint32_t)temp;
             break;
         case INSTR_XORROR:
-            r[instr->dst] = rotr64(r[instr->dst], instr->imm) ^ mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = rotr64(r[instr->dst], instr->imm) ^ mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_ADDROR:
-            r[instr->dst] = rotr64(r[instr->dst], instr->imm) + mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = rotr64(r[instr->dst], instr->imm) + mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_SUBROR:
-            r[instr->dst] = rotr64(r[instr->dst], instr->imm) - mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = rotr64(r[instr->dst], instr->imm) - mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_XORASR:
-            r[instr->dst] = (((int64_t)r[instr->dst]) >> instr->imm) ^ mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = (((int64_t)r[instr->dst]) >> instr->imm) ^ mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_ADDASR:
-            r[instr->dst] = (((int64_t)r[instr->dst]) >> instr->imm) + mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = (((int64_t)r[instr->dst]) >> instr->imm) + mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_SUBASR:
-            r[instr->dst] = (((int64_t)r[instr->dst]) >> instr->imm) - mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = (((int64_t)r[instr->dst]) >> instr->imm) - mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_XORLSR:
-            r[instr->dst] = (r[instr->dst] >> instr->imm) ^ mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = (r[instr->dst] >> instr->imm) ^ mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_ADDLSR:
-            r[instr->dst] = (r[instr->dst] >> instr->imm) + mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = (r[instr->dst] >> instr->imm) + mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_SUBLSR:
-            r[instr->dst] = (r[instr->dst] >> instr->imm) - mem[(r[instr->src] / 8) % 256];
+            r[instr->dst] = (r[instr->dst] >> instr->imm) - mem[(r[instr->src] / 8) % HASHWX_MEM_SIZE];
             break;
         case INSTR_BRANCH:
             if (branch_counter != 0 && (branch_flag & 32) == 0) {
