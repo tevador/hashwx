@@ -17,8 +17,8 @@
     } while (0)
 #define EMIT_BYTE(p,x) *((p)++) = x
 
-#define WASM_REG_PROGRAM_SIZE 173
-#define WASM_MEM_PROGRAM_SIZE 179
+#define WASM_REG_PROGRAM_SIZE 170
+#define WASM_MEM_PROGRAM_SIZE 176
 
 #define WASM_BINARY_MAGIC 0x00, 0x61, 0x73, 0x6d
 #define WASM_BINARY_VERSION 0x01, 0x00, 0x00, 0x00
@@ -175,7 +175,7 @@ static const uint8_t code_reg_epilogue[] = {
     OP_STORE, ALIGN, 0, /* i64.store align, 0 */
 };
 
-static uint8_t code_branch[] = {
+static const uint8_t code_branch[] = {
     OP_GET,         /* local.get $bc */
     LOC_BC,
     OP_GET,         /* local.get $bf */

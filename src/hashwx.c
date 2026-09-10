@@ -52,12 +52,16 @@ uint64_t hashwx_exec(const hashwx_ctx* ctx, uint64_t input) {
     //adjust R9 to be 5 mod 8
     r[9] = (r[7] & -8) | 5;
     //execute
-#ifndef HASHWX_COMPILER_WASM
     if (ctx->type & HASHWX_COMPILED) {
+#ifdef HASHWX_COMPILER_WASM
+        /* compiled contexts must go through hashwx_exec_begin/exec_final */
+        assert(false);
+        return 0;
+#else
         ctx->func(r);
+#endif
     }
     else
-#endif
     {
         hashwx_program_list_execute(ctx->program_list, r);
     }

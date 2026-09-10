@@ -247,7 +247,7 @@ At the beginning of this phase, the VM Branch counter register is reset to 32 an
 
 ### 3.4 Finalization phase
 
-The final hash value is calculated from the values of registers R0-R8 after the memory read phase. First, two SipRounds are executed to mix registers R0-R3 and R4-R7 (SipRound is described in Appendix A.1). The final hash value is `R3 ^ R7 ^ R9`.
+The final hash value is calculated from the values of registers R0-R9 after the memory read phase. First, two SipRounds are executed to mix registers R0-R3 and R4-R7 (SipRound is described in Appendix A.1). The final hash value is `R3 ^ R7 ^ R9`.
 
 ## Appendix
 
@@ -260,7 +260,7 @@ Siphash generator is a custom pseudorandom number generator. The internal state 
 SipRound is the basic building block of the generator. It mixes four 64-bit integers as follows:
 
 ```
-function sipround(v1, v2, v3, v4):
+function sipround(v0, v1, v2, v3):
     v0 += v1
     v2 += v3
     v1 = v1 >>>> 51
@@ -275,7 +275,7 @@ function sipround(v1, v2, v3, v4):
     v1 ^= v2
     v3 ^= v0
     v2 = v2 >>>> 32
-    return (v1, v2, v3, v4)
+    return (v0, v1, v2, v3)
 ```
 
 #### A.2 Generator initialization
@@ -300,7 +300,7 @@ function rng_init(k0, k1, salt):
 
 #### A.3 Random number generation
 
-The generator outputs its internal state in the order `v0`, `v1`, `v2` and `v3`. When the internal state is exhausted, a mix step is performed to refresh the state using the initial key values:
+The generator outputs its internal state in the order `v3`, `v2`, `v1` and `v0`. When the internal state is exhausted, a mix step is performed to refresh the state using the initial key values:
 
 ```
 function rng_mix(k0, k1, v0, v1, v2, v3):

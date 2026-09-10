@@ -31,6 +31,12 @@
         x12     = R8
         x13     = R9
         x14-x17 = temporary
+
+    Note: The emitted aarch64 code is optimized for the A53 dual-issue
+    pipeline. Some instructions are scheduled in a way that depends on
+    the table of permitted source permutations to avoid hazards.
+    The code may break if the source permutation list in the HashWX specs
+    gets changed.
 */
 
 static const uint8_t code_prologue[] = {

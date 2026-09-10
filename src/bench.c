@@ -41,7 +41,16 @@ static int worker(void* args) {
     for (int seed = job->start; seed < job->end; seed += job->step) {
         siphash_rng gen;
         hashwx_rng_init(&gen, &worker_key, seed);
+#ifdef PLATFORM_LE
         hashwx_make(job->ctx, (const uint8_t*)&gen.state);
+#else
+        uint64_t temp_seed[4];
+        temp_seed[0] = platform_load64(&gen.state[0]);
+        temp_seed[1] = platform_load64(&gen.state[1]);
+        temp_seed[2] = platform_load64(&gen.state[2]);
+        temp_seed[3] = platform_load64(&gen.state[3]);
+        hashwx_make(job->ctx, (const uint8_t*)&temp_seed);
+#endif
         for (int nonce = 0; nonce < job->nonces; ++nonce) {
             uint64_t hashval = hashwx_exec(job->ctx, nonce);
             job->hash_sum ^= hashval;
