@@ -11,10 +11,16 @@
 #include "instruction.h"
 #include "siphash_rng.h"
 
-#define HASHWX_PROGRAM_SIZE 10
+#define HASHWX_PROGRAM_SIZE 11
 #define HASHWX_NUM_PROGRAMS 32
-#define HASHWX_REG_SIZE 10
-#define HASHWX_MEM_SIZE 256
+#define HASHWX_NUM_REPEATS 4
+#define HASHWX_BRANCH_COUNT 32
+#define HASHWX_REG_SIZE 9
+#define HASHWX_MEM_SIZE 16384
+#define HASHWX_MEM_WORDS (HASHWX_MEM_SIZE / 8)
+
+static_assert(HASHWX_NUM_REPEATS * (HASHWX_NUM_PROGRAMS + HASHWX_BRANCH_COUNT) * 64
+               == HASHWX_MEM_SIZE, "STORE count must exactly fill VM memory");
 
 typedef struct hashwx_program {
     instruction code[HASHWX_PROGRAM_SIZE];

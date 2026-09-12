@@ -17,8 +17,10 @@
     } while (0)
 #define EMIT_BYTE(p,x) *((p)++) = x
 
-#define WASM_REG_PROGRAM_SIZE 170
-#define WASM_MEM_PROGRAM_SIZE 176
+#define WASM_REG_PROGRAM_SIZE 170      /* with CBRANCH */
+#define WASM_REG_PROGRAM_SIZE_LAST 167 /* with UBRANCH */
+#define WASM_MEM_PROGRAM_SIZE 176      /* with CBRANCH */
+#define WASM_MEM_PROGRAM_SIZE_LAST 173 /* with UBRANCH */
 
 #define WASM_BINARY_MAGIC 0x00, 0x61, 0x73, 0x6d
 #define WASM_BINARY_VERSION 0x01, 0x00, 0x00, 0x00
@@ -35,10 +37,10 @@
 #define LOC_R6 0x08 /* VM register R6 */
 #define LOC_R7 0x09 /* VM register R7 */
 #define LOC_R8 0x0a /* VM register R8 */
-#define LOC_R9 0x0b /* VM register R9 */
-#define LOC_BC 0x0c /* VM register BC */
-#define LOC_BF 0x0d /* VM register BF */
-#define LOC_MM 0x0e /* memory mask constant (2040) */
+#define LOC_BC 0x0b /* VM register BC */
+#define LOC_BF 0x0c /* VM register BF */
+#define LOC_MM 0x0d /* memory mask constant (16376) */
+#define LOC_RC 0x0e /* repeat counter */
 
 #define OP_INVALID 0x00
 #define OP_NOP 0x01
@@ -46,6 +48,7 @@
 #define OP_IF 0x04
 #define OP_END 0x0b
 #define OP_BR 0x0c
+#define OP_BR_IF 0x0d
 #define OP_GET 0x20
 #define OP_SET 0x21
 #define OP_TEE 0x22
@@ -54,6 +57,7 @@
 #define OP_CONST_32 0x41
 #define OP_CONST_64 0x42
 #define OP_EQZ 0x50
+#define OP_NE_64 0x52
 #define OP_ADD_32 0x6a
 #define OP_SUB_32 0x6b
 #define OP_ADD_64 0x7c
@@ -86,8 +90,8 @@ static const uint8_t code_prologue[] = {
     0x07, 0x08, 0x01,
     0x04, 'e', 'x', 'e', 'c', 0x00, 0x00,
     /* Section Code */
-    0x0a, 0xdb, 0xd7, 0x00 /*11227*/, 1,
-    0xd7, 0xd7, 0x00 /*11223*/, 1, 13, TYPE_I64,
+    0x0a, 0xfa, 0xd7, 0x00 /*11258*/, 1,
+    0xf6, 0xd7, 0x00 /*11254*/, 1, 13, TYPE_I64,
     OP_GET, PAR_RP, OP_LOAD, ALIGN,  0, OP_SET, LOC_R0,
     OP_GET, PAR_RP, OP_LOAD, ALIGN,  8, OP_SET, LOC_R1,
     OP_GET, PAR_RP, OP_LOAD, ALIGN, 16, OP_SET, LOC_R2,
@@ -97,10 +101,9 @@ static const uint8_t code_prologue[] = {
     OP_GET, PAR_RP, OP_LOAD, ALIGN, 48, OP_SET, LOC_R6,
     OP_GET, PAR_RP, OP_LOAD, ALIGN, 56, OP_SET, LOC_R7,
     OP_GET, PAR_RP, OP_LOAD, ALIGN, 64, OP_SET, LOC_R8,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN, 72, OP_SET, LOC_R9,
     OP_CONST_64, 0, OP_SET, LOC_BC,
-    OP_CONST_64, 0xf8, 0x0f /*2040*/, OP_SET, LOC_MM,
-    OP_CONST_32, 0x80, 0x10 /*2048*/, OP_GET, PAR_MP, OP_ADD_32, OP_SET, PAR_MP
+    OP_CONST_64, 0xf8, 0xff, 0x00 /*16376*/, OP_SET, LOC_MM,
+    OP_CONST_32, 0x80, 0x80, 0x01 /*16384*/, OP_GET, PAR_MP, OP_ADD_32, OP_SET, PAR_MP
 };
 
 static const uint8_t code_epilogue[] = {
@@ -138,17 +141,43 @@ static const uint8_t code_clear_bc[] = {
     LOC_BC
 };
 
+static const uint8_t code_set_rc[] = {
+    OP_CONST_64, /* i64.const */
+    4,
+    OP_SET, /* local.set */
+    LOC_RC
+};
+
+static const uint8_t code_repeat_loop_start[] = {
+    OP_LOOP, /* loop */
+    TYPE_VOID
+};
+
+static const uint8_t code_repeat_loop_end[] = {
+    OP_GET, LOC_RC,     /* local.get $rc */
+    OP_CONST_64, 1,     /* i64.const 1 */
+    OP_SUB_64,          /* i64.sub */
+    OP_TEE, LOC_RC,     /* local.tee $rc */
+    OP_CONST_64, 0,     /* i64.const 0 */
+    OP_NE_64,           /* i64.ne */
+    OP_BR_IF, 0x00,     /* br_if 0 */
+    OP_END,             /* end */
+};
+
 static const uint8_t code_reg_prologue[] = {
-    OP_GET, PAR_MP, /* local.get $mp */
-    OP_CONST_32, 0xc0, 0x00, /* i32.const 64 */
-    OP_SUB_32, /* i32.sub */
-    OP_SET, PAR_MP, /* local.set $mp */
     OP_LOOP, /* loop */
     TYPE_VOID
 };
 
 static const uint8_t code_reg_epilogue[] = {
     OP_END, /* end */
+};
+
+static const uint8_t code_store[] = {
+    OP_GET, PAR_MP, /* local.get $mp */
+    OP_CONST_32, 0xc0, 0x00, /* i32.const 64 */
+    OP_SUB_32, /* i32.sub */
+    OP_SET, PAR_MP, /* local.set $mp */
     OP_GET, PAR_MP, /* local.get $mp */
     OP_GET, LOC_R0, /* local.get $r0 */
     OP_STORE, ALIGN, 56, /* i64.store align, 56 */
@@ -181,6 +210,27 @@ static const uint8_t code_branch[] = {
     OP_GET,         /* local.get $bf */
     LOC_BF,
     OP_OR,          /* i64.or */
+    OP_CONST_64,    /* i64.const 32 */
+    32,
+    OP_AND,         /* i64.and */
+    OP_EQZ,         /* i64.eqz */
+    OP_IF,          /* if */
+    TYPE_VOID,
+    OP_CONST_64,    /* i64.const 1 */
+    1,
+    OP_GET,         /* local.get $bc */
+    LOC_BC,
+    OP_ADD_64,      /* i64.add */
+    OP_SET,         /* local.set bc */
+    LOC_BC,
+    OP_BR,          /* br */
+    0x01,
+    OP_END,         /* end */
+};
+
+static const uint8_t code_ubranch[] = {
+    OP_GET,         /* local.get $bc */
+    LOC_BC,
     OP_CONST_64,    /* i64.const 32 */
     32,
     OP_AND,         /* i64.and */
@@ -295,9 +345,19 @@ static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* code
             EMIT_BYTE(pos, LOC_R0 + instr->dst);
             break;
         }
-        case INSTR_BRANCH:
+        case INSTR_CBRANCH:
         {
             EMIT(pos, code_branch);
+            break;
+        }
+        case INSTR_UBRANCH:
+        {
+            EMIT(pos, code_ubranch);
+            break;
+        }
+        case INSTR_STORE:
+        {
+            EMIT(pos, code_store);
             break;
         }
         case INSTR_HALT:
@@ -307,7 +367,7 @@ static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* code
         }
     }
     EMIT(pos, code_reg_epilogue);
-    assert(pos - code == WASM_REG_PROGRAM_SIZE);
+    assert(pos - code == WASM_REG_PROGRAM_SIZE || pos - code == WASM_REG_PROGRAM_SIZE_LAST);
     return pos;
 }
 
@@ -391,11 +451,18 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* code
             EMIT_BYTE(pos, LOC_R0 + instr->dst);
             break;
         }
-        case INSTR_BRANCH:
+        case INSTR_CBRANCH:
         {
             EMIT(pos, code_branch);
             break;
         }
+        case INSTR_UBRANCH:
+        {
+            EMIT(pos, code_ubranch);
+            break;
+        }
+        case INSTR_STORE:
+            break;
         case INSTR_HALT:
             break;
         default:
@@ -403,7 +470,7 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* code
         }
     }
     EMIT_BYTE(pos, OP_END);
-    assert(pos - code == WASM_MEM_PROGRAM_SIZE);
+    assert(pos - code == WASM_MEM_PROGRAM_SIZE || pos - code == WASM_MEM_PROGRAM_SIZE_LAST);
     return pos;
 }
 
@@ -411,15 +478,23 @@ void hashwx_compile_wasm(uint8_t* code, const hashwx_program_list* program_list)
     uint8_t* pos = code;
     EMIT(pos, code_prologue);
 
+    /* repeat 4x with BC=32 (memory write) */
+    EMIT(pos, code_set_rc);
+    EMIT(pos, code_repeat_loop_start);
+    EMIT(pos, code_clear_bc);
     for (uint32_t i = 0; i < HASHWX_NUM_PROGRAMS; ++i) {
         pos = compile_program_reg(&program_list->prog[i], pos);
     }
+    EMIT(pos, code_repeat_loop_end);
 
+    /* repeat 4x with BC=32 (memory read) */
+    EMIT(pos, code_set_rc);
+    EMIT(pos, code_repeat_loop_start);
     EMIT(pos, code_clear_bc);
-
     for (uint32_t i = 0; i < HASHWX_NUM_PROGRAMS; ++i) {
         pos = compile_program_mem(&program_list->prog[i], pos);
     }
+    EMIT(pos, code_repeat_loop_end);
 
     EMIT(pos, code_epilogue);
     assert(pos - code == HASHWX_CODE_SIZE);

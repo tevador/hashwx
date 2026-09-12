@@ -30,7 +30,7 @@
         rsp    = stack/memory ptr
         rbp    = 32-(BC-1)
         rsi    = R8
-        rdi    = R9
+        rdi    = repeat counter
         r8-r15 = R0-R7
 */
 
@@ -56,13 +56,12 @@ static const uint8_t code_prologue[] = {
     0x4c, 0x8b, 0x71, 0x30, /* mov r14, qword ptr [rcx+48] */
     0x4c, 0x8b, 0x79, 0x38, /* mov r15, qword ptr [rcx+56] */
     0x48, 0x8b, 0x71, 0x40, /* mov rsi, qword ptr [rcx+64] */
-    0x48, 0x8b, 0x79, 0x48, /* mov rdi, qword ptr [rcx+72] */
     0x31, 0xdb, /* xor ebx, ebx */
     0x8d, 0x6b, 0x01 /* lea ebp, [rbx+1] */
 };
 
 static const uint8_t code_epilogue[] = {
-    0x48, 0x81, 0xc4, 0x00, 0x08, 0x00, 0x00, /* add rsp, 2048 */
+    0x48, 0x81, 0xc4, 0x00, 0x40, 0x00, 0x00, /* add rsp, 16384 */
     0x4c, 0x89, 0x01, /* mov qword ptr [rcx], r8 */
     0x4c, 0x89, 0x49, 0x08, /* mov qword ptr [rcx+8], r9 */
     0x4c, 0x89, 0x51, 0x10, /* mov qword ptr [rcx+16], r10 */
@@ -95,6 +94,11 @@ static const uint8_t code_branch[] = {
     0xf6, 0xc2, 0x20  /* test dl, 32 */
 };
 
+static const uint8_t code_ubranch[] = {
+    0x8d, 0x6b, 0x01, /* lea ebp, [rbx+1] */
+    0xf6, 0xc3, 0x20  /* test bl, 32 */
+};
+
 static const uint8_t code_store[] = {
     0x41, 0x50, /* push r8 */
     0x41, 0x51, /* push r9 */
@@ -107,11 +111,15 @@ static const uint8_t code_store[] = {
 };
 
 static const uint8_t code_address[] = {
-    0x25, 0xf8, 07, 00, 00 /* and eax, 2040 */
+    0x25, 0xf8, 0x3f, 0x00, 0x00 /* and eax, 16376 */
 };
 
 static const uint8_t code_clear_bc[] = {
     0x31, 0xdb /* xor ebx, ebx */
+};
+
+static const uint8_t code_set_rc[] = {
+    0xbf, 0x04, 0x00, 0x00, 0x00 /* mov edi, 4 */
 };
 
 static const uint32_t tpl_mul[] = {
@@ -209,6 +217,16 @@ static inline uint8_t* emit_jz(uint8_t* pos, uint8_t* targetp2) {
     return pos;
 }
 
+static inline uint8_t* emit_dec_edi_jnz(uint8_t* pos, uint8_t* target) {
+    const uint32_t isn = 0x850fcfff;
+    /* dec edi */
+    /* jnz rel32 */
+    EMIT(pos, isn);
+    uint32_t offset = (uint32_t)(target - (pos + 4));
+    EMIT(pos, offset);
+    return pos;
+}
+
 static uint8_t* compile_program_reg(const hashwx_program * program, uint8_t* pos) {
     uint8_t* target = NULL;
     for (int i = 0; i < HASHWX_PROGRAM_SIZE; ++i) {
@@ -228,8 +246,6 @@ static uint8_t* compile_program_reg(const hashwx_program * program, uint8_t* pos
         }
         case INSTR_RMCG:
         {
-            target = pos; /* +2 */
-            EMIT(pos, code_target);
             /* imul dst, src */
             pos = emit_imul_reg_4c(pos, instr->dst, instr->src - 2);
             /* ror dst, imm */
@@ -255,11 +271,25 @@ static uint8_t* compile_program_reg(const hashwx_program * program, uint8_t* pos
             pos = emit_op_reg_4d(pos, tpl_xas_reg[opcode % 3], instr->dst, instr->src);
             break;
         }
-        case INSTR_BRANCH:
+        case INSTR_CBRANCH:
         {
             EMIT(pos, code_branch);
             /* jz target */
             pos = emit_jz(pos, target);
+            break;
+        }
+        case INSTR_UBRANCH:
+        {
+            EMIT(pos, code_ubranch);
+            /* jz target */
+            pos = emit_jz(pos, target);
+            break;
+        }
+        case INSTR_STORE:
+        {
+            target = pos; /* +2 */
+            EMIT(pos, code_target);
+            EMIT(pos, code_store);
             break;
         }
         case INSTR_HALT:
@@ -286,7 +316,7 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
             pos = emit_op_reg_4c(pos, 0xc089, 0, instr->src);
             /* or/xor/add dst, imm */
             pos = emit_op_imm(pos, tpl_mul[opcode], instr->dst, instr->imm);
-            /* and eax, 2040 */
+            /* and eax, 16376 */
             EMIT(pos, code_address);
             /* imul dst, qword ptr [rsp+rax] */
             pos = emit_imul_mem(pos, instr->dst);
@@ -294,8 +324,6 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
         }
         case INSTR_RMCG:
         {
-            target = pos; /* +2 */
-            EMIT(pos, code_target);
             /* imul dst, src */
             pos = emit_imul_reg_4c(pos, instr->dst, instr->src - 2);
             /* ror dst, imm */
@@ -319,17 +347,30 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
             pos = emit_op_reg_4c(pos, 0xc089, 0, instr->src);
             /* ror/sar/shr dst, imm */
             pos = emit_op_imm(pos, tpl_pre_xas[opcode / 3], instr->dst, instr->imm);
-            /* and eax, 2040 */
+            /* and eax, 16376 */
             EMIT(pos, code_address);
             /* xor/add/sub dst, qword ptr [rsp+rax] */
             pos = emit_op_mem(pos, tpl_xas_mem[opcode % 3], instr->dst);
             break;
         }
-        case INSTR_BRANCH:
+        case INSTR_CBRANCH:
         {
             EMIT(pos, code_branch);
             /* jz target */
             pos = emit_jz(pos, target);
+            break;
+        }
+        case INSTR_UBRANCH:
+        {
+            EMIT(pos, code_ubranch);
+            /* jz target */
+            pos = emit_jz(pos, target);
+            break;
+        }
+        case INSTR_STORE:
+        {
+            target = pos; /* +2 */
+            EMIT(pos, code_target);
             break;
         }
         case INSTR_HALT:
@@ -346,19 +387,27 @@ void hashwx_compile_x86(uint8_t* code, const hashwx_program_list* program_list) 
     uint8_t* pos = code;
     EMIT(pos, code_prologue);
 
+    /* repeat 4x with BC=32 (memory write) */
+    EMIT(pos, code_set_rc);
+    uint8_t* reg_phase_start = pos;
+    EMIT(pos, code_clear_bc);
     for (uint32_t i = 0; i < HASHWX_NUM_PROGRAMS; ++i) {
         pos = compile_program_reg(&program_list->prog[i], pos);
-        EMIT(pos, code_store);
     }
+    pos = emit_dec_edi_jnz(pos, reg_phase_start);
 
+    /* repeat 4x with BC=32 (memory read) */
+    EMIT(pos, code_set_rc);
+    uint8_t* mem_phase_start = pos;
     EMIT(pos, code_clear_bc);
-
     for (uint32_t i = 0; i < HASHWX_NUM_PROGRAMS; ++i) {
         pos = compile_program_mem(&program_list->prog[i], pos);
     }
+    pos = emit_dec_edi_jnz(pos, mem_phase_start);
 
     EMIT(pos, code_epilogue);
     hashwx_vm_rx(code, HASHWX_CODE_SIZE);
+    assert(pos - code <= HASHWX_CODE_SIZE);
 }
 
 #endif

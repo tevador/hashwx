@@ -28,7 +28,7 @@ typedef struct hashwx_ctx {
 #ifdef __wasm__
     uint8_t seed[HASHWX_SEED_SIZE];
     uint64_t reg[HASHWX_REG_SIZE];
-    uint64_t mem[HASHWX_MEM_SIZE];
+    uint64_t mem[HASHWX_MEM_WORDS];
 #endif
 } hashwx_ctx;
 
