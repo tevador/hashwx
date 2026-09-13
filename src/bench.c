@@ -14,10 +14,15 @@
 typedef int thrd_t;
 #endif
 
+#define WORKER_OK 0
+#define WORKER_ERROR_ALLOC 1
+#define WORKER_ERROR_NOSUPP 2
+
 typedef struct worker_job {
     int id;
     thrd_t thread;
     hashwx_ctx* ctx;
+    hashwx_type flags;
     int64_t total_hashes;
     uint64_t best_hash;
     uint64_t threshold;
@@ -26,6 +31,7 @@ typedef struct worker_job {
     int step;
     int end;
     int nonces;
+    int res;
 } worker_job;
 
 static const siphash_key worker_key = {
@@ -38,6 +44,13 @@ static int worker(void* args) {
     job->total_hashes = 0;
     job->best_hash = UINT64_MAX;
     job->hash_sum = 0;
+    job->ctx = hashwx_alloc(job->flags);
+    if (job->ctx == NULL) {
+        return WORKER_ERROR_ALLOC;
+    }
+    if (job->ctx == HASHWX_NOTSUPP) {
+        return WORKER_ERROR_NOSUPP;
+    }
     for (int seed = job->start; seed < job->end; seed += job->step) {
         siphash_rng gen;
         hashwx_rng_init(&gen, &worker_key, seed);
@@ -67,7 +80,8 @@ static int worker(void* args) {
         }
         job->total_hashes += job->nonces;
     }
-    return 0;
+    hashwx_free(job->ctx);
+    return WORKER_OK;
 }
 
 int main(int argc, char** argv) {
@@ -103,15 +117,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     for (int thd = 0; thd < threads; ++thd) {
-        jobs[thd].ctx = hashwx_alloc(flags);
-        if (jobs[thd].ctx == NULL) {
-            printf("Error: memory allocation failure\n");
-            return 1;
-        }
-        if (jobs[thd].ctx == HASHWX_NOTSUPP) {
-            printf("Error: not supported. Try with --interpret\n");
-            return 1;
-        }
+        jobs[thd].flags = flags;
         jobs[thd].id = thd;
         jobs[thd].start = start + thd;
         jobs[thd].step = threads;
@@ -130,7 +136,7 @@ int main(int argc, char** argv) {
             }
         }
         for (int thd = 0; thd < threads; ++thd) {
-            thrd_join(jobs[thd].thread, NULL);
+            thrd_join(jobs[thd].thread, &jobs[thd].res);
         }
 #endif
     }
@@ -138,6 +144,19 @@ int main(int argc, char** argv) {
         worker(jobs);
     }
     time_end = platform_wall_clock();
+    int ret_val = 0;
+    for (int thd = 0; thd < threads; ++thd) {
+        if (jobs[thd].res == WORKER_ERROR_ALLOC) {
+            printf("Error: memory allocation failure\n");
+            ret_val = 1;
+            goto cleanup;
+        }
+        if (jobs[thd].res == WORKER_ERROR_NOSUPP) {
+            printf("Error: not supported. Try with --interpret\n");
+            ret_val = 1;
+            goto cleanup;
+        }
+    }
     uint64_t hash_sum = 0;
     for (int thd = 0; thd < threads; ++thd) {
         total_hashes += jobs[thd].total_hashes;
@@ -145,7 +164,6 @@ int main(int argc, char** argv) {
         if (jobs[thd].best_hash < best_hash) {
             best_hash = jobs[thd].best_hash;
         }
-        hashwx_free(jobs[thd].ctx);
     }
     double elapsed = time_end - time_start;
     printf("Total hashes: %" PRIi64 "\n", total_hashes);
@@ -154,6 +172,7 @@ int main(int argc, char** argv) {
     printf("Best hash: %016" PRIx64, best_hash);
     printf(" (diff: %" PRIu64 ")\n", UINT64_MAX / best_hash);
     printf("Hash sum: %016" PRIx64 "\n", hash_sum);
+cleanup:
     free(jobs);
-    return 0;
+    return ret_val;
 }
