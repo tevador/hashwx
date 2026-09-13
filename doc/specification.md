@@ -20,11 +20,11 @@ Program buffer holds the program to be executed by the VM. Supported instruction
 
 ### 1.2 Registers
 
-The VM has a total of 14 registers. The first 10 registers (R0-R9) are arithmetic registers and the remaining 4 registers (PC, BC, BF, MF) are control registers and flags.
+The VM has a total of 14 registers. The first 9 registers (R0-R8) are arithmetic registers and the remaining 5 registers (PC, BC, BF, MF, SP) are control registers and flags.
 
 #### 1.2.1 Arithmetic registers
 
-The registers R0-R9 are used for arithmetic operations. Their size is 64 bits. Registers R0-R7 are read-write registers, while R8 and R9 are read-only registers used by the `RMCG` instruction.
+The registers R0-R8 are used for arithmetic operations. Their size is 64 bits. Registers R0-R7 are read-write registers, while R8 is a read-only registers used by the `RMCG` instruction.
 
 #### 1.2.2 Control registers
 
@@ -44,9 +44,13 @@ This register is a 1-bit flag that determines if a branch will be taken or not t
 
 This register is a 1-bit flag that determines if the VM executes in the register operand mode (MF=0) or in the memory operand mode (MF=1). The flag is read-only.
 
+##### 1.2.2.5 Store pointer (SP)
+
+This register holds the memory address where the STORE instruction writes to memory.
+
 ### 1.3 Memory
 
-The VM has 2048 bytes of memory. The memory is read-only and should be initialized before setting the Memory flag to 1.
+The VM has 16384 bytes of memory. The STORE instruction can write to memory if MF=0 and other instructions can read from memory if MF=1.
 
 ### 1.4 Instruction set
 
@@ -59,7 +63,7 @@ Every instruction in the program buffer consists of:
 3. A source register `src`, if applicable.
 4. An immediate value `imm`, if applicable. The maximum immediate size is 7 bits.
 
-The actual source operand used by an instruction depends on the value of the Memory flag. If MF=0, the register value is used directly as the source operand. If MF=1, the value in the register (modulo 2048) is used to load an 8-byte aligned value from the memory.
+The actual source operand used by an instruction depends on the value of the Memory flag. If MF=0, the register value is used directly as the source operand. If MF=1, the value in the register (modulo 16384) is used to load an 8-byte aligned value from the memory.
 
 #### 1.4.2 Instruction listing
 
@@ -67,7 +71,7 @@ The actual source operand used by an instruction depends on the value of the Mem
 * `>>` denotes an arithmetic (signed) right shift
 * `>>>` denotes a logical (unsigned) right shift
 * `>>>>` denotes circular right shift (rotation)
-* the source operand is evaluated as: `[src] = MF ? memory[src & 2040] : src`
+* the source operand is evaluated as: `[src] = MF ? memory[src & 16376] : src`
 * the RMCG instruction always uses a register source operand
 
 *Table 1.4.2 - HashWX instructions*
@@ -77,7 +81,7 @@ The actual source operand used by an instruction depends on the value of the Mem
 |0|MULOR|`dst=(dst\|imm)*[src]`|R0-R7|R0-R7|`1,9,33`|
 |1|MULXOR|`dst=(dst^imm)*[src]`|R0-R7|R0-R7|`1,9,33`|
 |2|MULADD|`dst=(dst+imm)*[src]`|R0-R7|R0-R7|`1,9,33`|
-|3|RMCG|`dst=(dst*src)>>>>imm;BF=dst[5];`|R0-R7|R8-R9|`1-63`|
+|3|RMCG|`dst=(dst*src)>>>>imm;BF=dst[5];`|R0-R7|R8|`1-63`|
 |4|XORROR|`dst=(dst>>>>imm)^[src]`|R0-R7|R0-R7|`1-63`|
 |5|ADDROR|`dst=(dst>>>>imm)+[src]`|R0-R7|R0-R7|`1-63`|
 |6|SUBROR|`dst=(dst>>>>imm)-[src]`|R0-R7|R0-R7|`1-63`|
@@ -87,8 +91,10 @@ The actual source operand used by an instruction depends on the value of the Mem
 |10|XORLSR|`dst=(dst>>>imm)^[src]`|R0-R7|R0-R7|`1-3`|
 |11|ADDLSR|`dst=(dst>>>imm)+[src]`|R0-R7|R0-R7|`1-3`|
 |12|SUBLSR|`dst=(dst>>>imm)-[src]`|R0-R7|R0-R7|`1-3`|
-|13|BRANCH|`if(BC && !BF){BC--;PC=0;}`|||
-|14|HALT||||||
+|13|CBRANCH|`if(BC && !BF){BC--;PC=0;}`|||
+|14|UBRANCH|`if(BC){BC--;PC=0;}`|||
+|15|STORE|`if(!MF){SP=SP-64;store(SP, [R7..R0]);}`|||
+|16|HALT||||||
 
 ##### 1.4.2.1 MULOR
 This instruction performs a bitwise OR of the destination register with the immediate value, multiplies it by the source operand and stores the result in the destination register.
@@ -129,10 +135,16 @@ This instruction performs a logical right shift of the destination register by t
 ##### 1.4.2.13 SUBLSR
 This instruction performs a logical right shift of the destination register by the immediate count. The source operand is subtracted from the shifted value and the result is stored in the destination register.
 
-##### 1.4.2.14 BRANCH
+##### 1.4.2.14 CBRANCH
 This instruction performs a conditional branch. The branch is taken if BC is nonzero and BF is zero. If the branch is taken, the BC register is decremented by 1 and the VM jumps to the first instruction in the program buffer.
 
-##### 1.4.2.15 HALT
+##### 1.4.2.15 UBRANCH
+This instruction performs an unconditional branch. The branch is taken as long as BC is nonzero. If the branch is taken, the BC register is decremented by 1 and the VM jumps to the first instruction in the program buffer.
+
+##### 1.4.2.16 STORE
+If MF=0, this instruction decreases the value of SP by 64 and then stores R7 at the address of SP, R6 at the address SP+8, etc. R0 is stored at SP+56. If MF=1, this instruction is a no-op.
+
+##### 1.4.2.17 HALT
 This instruction stops the VM. No register values are affected.
 
 ## 2. HashWX instance generation
@@ -148,24 +160,25 @@ Siphash keys are used to initialize the Siphash generator, which is a pseudorand
 
 ### 2.2 Program structure
 
-Each HashWX program consists of 10 instructions and has the following structure:
+Each HashWX program consists of 11 instructions and has the following structure:
 
 *Table 2.2.1 - HashWX program structure*
 
 |index|opcode|arguments|
 |-----|------|---------|
-|0|RMCG|dst, src, imm|
-|1|XAS*|dst, src, imm|
-|2|MUL*|dst, src, imm|
-|3|XAS*|dst, src, imm|
-|4|MUL*|dst, src, imm|
-|5|XAS*|dst, src, imm|
-|6|MUL*|dst, src, imm|
-|7|BRANCH|
+|0|STORE||
+|1|RMCG|dst, src, imm|
+|2|XAS*|dst, src, imm|
+|3|MUL*|dst, src, imm|
+|4|XAS*|dst, src, imm|
+|5|MUL*|dst, src, imm|
+|6|XAS*|dst, src, imm|
+|7|MUL*|dst, src, imm|
 |8|XAS*|dst, src, imm|
-|9|HALT|
+|9|*BRANCH||
+|10|HALT||
 
-MUL* refers to one of the 3 MUL opcodes (0-2) and XAS* refers to one of the 9 XOR/ADD/SUB opcodes (4-12) from table 1.4.2.
+MUL* refers to one of the 3 MUL opcodes (0-2), XAS* refers to one of the 9 XOR/ADD/SUB opcodes (4-12) and *BRANCH refers to one fo the two branch opcodes (13-14) from table 1.4.2.
 
 ### 2.3 Program generation
 
@@ -173,7 +186,7 @@ Each random program is generated from 16 pseudorandom 64-bit numbers output from
 
 #### 2.3.1 Opcodes
 
-The XAS instructions at indexes 1, 3, 5 and 8 can have one of 9 possible opcodes. These opcodes are selected from the lookup table 2.3.1.1 based on the least significant 32 bits of `gen[0]`, `gen[2]`, `gen[4]` and `gen[6]`.
+The XAS instructions at indexes 2, 4, 6 and 8 can have one of 9 possible opcodes. These opcodes are selected from the lookup table 2.3.1.1 based on the least significant 32 bits of `gen[0]`, `gen[2]`, `gen[4]` and `gen[6]`.
 
 *Table 2.3.1.1 - XAS lookup table*
 
@@ -189,7 +202,7 @@ The XAS instructions at indexes 1, 3, 5 and 8 can have one of 9 possible opcodes
 |7|ADDLSR|
 |8|SUBLSR|
 
-The MUL instructions at indexes 2, 4 and 6 can have one of 3 possible opcodes. These opcodes are selected based on the least significant 32 bits of `gen[1]`, `gen[3]` and `gen[5]` as shown in table 2.3.1.2
+The MUL instructions at indexes 3, 5 and 7 can have one of 3 possible opcodes. These opcodes are selected based on the least significant 32 bits of `gen[1]`, `gen[3]` and `gen[5]` as shown in table 2.3.1.2
 
 *Table 2.3.1.2 - MUL lookup table*
 
@@ -199,26 +212,21 @@ The MUL instructions at indexes 2, 4 and 6 can have one of 3 possible opcodes. T
 |1|MULXOR|
 |2|MULADD|
 
+The *BRANCH instructions are not selected at random. The first 31 programs use the CBRANCH instruction. The last program uses UBRANCH to ensure that the value of BC is zero at the end.
+
 #### 2.3.2 Destinations
 
-A total of 8 instructions in each program need a destination register (indexes 0-6 and 8). Destinations are selected by taking a random permutation of the registers R0-R7. The random permutation is produced using the Fisher-Yates shuffle with the upper 32 bits of `gen[0]` to `gen[6]` used for index selection. The Fisher-Yates shuffle algorithm is described in Appendix B.
+A total of 8 instructions in each program need a destination register (indexes 1-8). Destinations are selected by taking a random permutation of the registers R0-R7. The random permutation is produced using the Fisher-Yates shuffle with the upper 32 bits of `gen[0]` to `gen[6]` used for index selection. The Fisher-Yates shuffle algorithm is described in Appendix B.
 
 #### 2.3.3 Sources
 
-A total of 7 instructions in each program need a source register from the range R0-R7 (indexes 1-6 and 8). These sources are selected as one of 625 permitted permutations of the destinations. The source permutation index is calculated as `gen[7] % 625`. The permitted source permutations are listed in Appendix C.
+A total of 7 instructions in each program need a source register from the range R0-R7 (indexes 2-8). These sources are selected as one of 625 permitted permutations of the destinations. The source permutation index is calculated as `gen[7] % 625`. The permitted source permutations are listed in Appendix C.
 
-The RMCG instruction at index 0 can take either R8 or R9 as its source operand. This choice is determined by the value `gen[7] % 2` according to Table 2.3.3.1.
-
-*Table 2.3.3.1 - RMCG src register*
-
-|`gen[7] % 2`|register|
-|-----|------|
-|0|R8|
-|1|R9|
+The RMCG instruction at index 1 always takes R8 as its source operand.
 
 #### 2.3.4 Immediates
 
-A total of 8 instructions in each program need an immediate value (indexes 0-6 and 8). Immediates are selected from `gen[8]` to `gen[15]` modulo the number of possible immediate values permitted for a given opcode. 
+A total of 8 instructions in each program need an immediate value (indexes 1-8). Immediates are selected from `gen[8]` to `gen[15]` modulo the number of possible immediate values permitted for a given opcode. 
 
 ## 3. HashWX calculation
 
@@ -235,19 +243,21 @@ The whole algorithm in pseudocode is described in Appendix D.
 
 A Siphash generator is initialized using the Siphash key from the HashWX instance and the nonce value as the salt. The first 8 random numbers from the generator are used to initialize the registers R0-R7.
 
-The register R8 is initialized as `R8 = (R4 & -8) | 3` and the register R9 is initialized as `R9 = (R7 & -8) | 5`.
+The register R8 is initialized as `R8 = ((R0 ^ R4) & -8) | 3`.
 
 ### 3.2 Memory write phase
 
-At the beginning of this phase, the VM Branch counter register is set to 32 and the Memory flag is set to 0. Then the 32 HashWX programs are executed sequentially. After each program halts, the register values R0-R7 are written to the VM memory buffer, filling it from the end (i.e. the value of R0 after the first program halts is written at memory offset 2040 and the value of R7 after the 32nd program halts is written at offset 0). No register values are modified between the 32 VM executions apart from the Program counter, which is reset to 0 at the beginning of each program.
+At the beginning of this phase, the Memory flag is set to 0 and the Store pointer is set to 16384. Then the following is repeated 4 times: The VM Branch counter register is set to 32 and the 32 HashWX programs are executed sequentially. No register values are modified between the VM executions apart from the Program counter, which is reset to 0 at the beginning of each program.
+
+The memory write phase always executes exactly 256 STORE instructions, which exactly fills the VM memory. The final value of SP is 0.
 
 ### 3.3 Memory read phase
 
-At the beginning of this phase, the VM Branch counter register is reset to 32 and the Memory flag is set to 1. Then the 32 HashWX programs are again executed sequentially. No register values are modified between the 32 VM executions apart from the Program counter, which is reset to 0 at the beginning of each program.
+At the beginning of this phase, the Memory flag is set to 1. Then the following is repeated 4 times: The VM Branch counter register is set to 32 and the 32 HashWX programs are executed sequentially. No register values are modified between the VM executions apart from the Program counter, which is reset to 0 at the beginning of each program.
 
 ### 3.4 Finalization phase
 
-The final hash value is calculated from the values of registers R0-R9 after the memory read phase. First, two SipRounds are executed to mix registers R0-R3 and R4-R7 (SipRound is described in Appendix A.1). The final hash value is `R3 ^ R7 ^ R9`.
+The final hash value is calculated from the values of registers R0-R8 after the memory read phase. First, two SipRounds are executed to mix registers R0-R3 and R4-R7 (SipRound is described in Appendix A.1). The final hash value is `R3 ^ R7 ^ R8`.
 
 ## Appendix
 
@@ -470,21 +480,21 @@ function hashwx_execute(self, nonce):
     vm = hashwx_vm()
     for i in [0..7]:
         vm.r[i] = gen.next()
-    vm.r[8] = (vm.r[4] & -8) | 3
-    vm.r[9] = (vm.r[7] & -8) | 5
-    vm.bc = 32
+    vm.r[8] = ((vm.r[0] ^ vm.r[4]) & -8) | 3
     vm.mf = 0
-    for i in [0..31]:
-        vm.program = self.program[i]
-        vm.execute()
-        for j in [0..7]:
-            vm.memory[2040-64*i-8*j] = vm.r[j]
-    vm.bc = 32
+    vm.sp = 16384
+    for i in [0..3]:
+        vm.bc = 32
+        for j in [0..31]:
+            vm.program = self.program[j]
+            vm.execute()
     vm.mf = 1
-    for i in [0..31]:
-        vm.program = self.program[i]
-        vm.execute()
+    for i in [0..3]:
+        vm.bc = 32
+        for j in [0..31]:
+            vm.program = self.program[j]
+            vm.execute()
     vm.r[0], vm.r[1], vm.r[2], vm.r[3] = sipround(vm.r[0], vm.r[1], vm.r[2], vm.r[3])
     vm.r[4], vm.r[5], vm.r[6], vm.r[7] = sipround(vm.r[4], vm.r[5], vm.r[6], vm.r[7])
-    return vm.r[3] ^ vm.r[7] ^ vm.r[9]
+    return vm.r[3] ^ vm.r[7] ^ vm.r[8]
 ```

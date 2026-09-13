@@ -20,7 +20,9 @@ typedef enum instr_type {
     INSTR_XORLSR,   /* logical shift and xor */
     INSTR_ADDLSR,   /* logical shift and add */
     INSTR_SUBLSR,   /* logical shift and subtract */
-    INSTR_BRANCH,   /* conditional branch */
+    INSTR_CBRANCH,  /* conditional branch */
+    INSTR_UBRANCH,  /* unconditional branch */
+    INSTR_STORE,    /* store to memory */
     INSTR_HALT,     /* halt */
 } instr_type;
 

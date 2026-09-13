@@ -72,7 +72,7 @@ extern "C" {
  *
  * @return pointer to a new HashWX instance. Returns NULL on memory allocation 
  *         failure and HASHWX_NOTSUPP if the requested type is not supported.
-*/
+ */
 HASHWX_API hashwx_ctx* hashwx_alloc(hashwx_type type);
 
 /*
@@ -80,7 +80,7 @@ HASHWX_API hashwx_ctx* hashwx_alloc(hashwx_type type);
  *
  * @param ctx is pointer to a HashWX instance.
  * @param seed is a pointer to the seed value.
-*/
+ */
 HASHWX_API void hashwx_make(hashwx_ctx* ctx, const uint8_t seed[HASHWX_SEED_SIZE]);
 
 /*
@@ -90,15 +90,15 @@ HASHWX_API void hashwx_make(hashwx_ctx* ctx, const uint8_t seed[HASHWX_SEED_SIZE
  *        been previously created by calling hashwx_make.
  * @param input is the input to be hashed (64-bit unsigned integer).
  *
- * @return the hash result as a 64-bit unsigned integer. 
- s*/
+ * @return the hash result as a 64-bit unsigned integer.
+ */
 HASHWX_API uint64_t hashwx_exec(const hashwx_ctx* ctx, uint64_t input);
 
 /*
  * Free a HashWX instance.
  *
  * @param ctx is pointer to a HashWX instance.
-*/
+ */
 HASHWX_API void hashwx_free(hashwx_ctx* ctx);
 
 #ifdef __cplusplus

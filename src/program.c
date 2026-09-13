@@ -381,7 +381,7 @@ static void gen_sources(uint32_t src[8], uint32_t dst[8], uint64_t select) {
     for (int i = 1; i < 8; ++i) {
         src[i] = dst[src_perm[i]];
     }
-    src[0] = 8 + (select % 2);
+    src[0] = 8;
 }
 
 static uint32_t gen_imm(instr_type opcode, uint64_t select) {
@@ -394,10 +394,11 @@ static uint32_t gen_imm(instr_type opcode, uint64_t select) {
     return 1 + (select % 3); /* 1-3 */
 }
 
-static void program_generate(siphash_rng* gen, hashwx_program* program) {
+static void program_generate(siphash_rng* gen, hashwx_program* program, bool is_last) {
     /*
         The program layout is as follows:
 
+        INSTR_STORE
         INSTR_RMCG (dst, imm)
         INSTR_XAS* (dst, src, imm)
         INSTR_MUL* (dst, src, imm)
@@ -405,13 +406,16 @@ static void program_generate(siphash_rng* gen, hashwx_program* program) {
         INSTR_MUL* (dst, src, imm)
         INSTR_XAS* (dst, src, imm)
         INSTR_MUL* (dst, src, imm)
-        INSTR_BRANCH
         INSTR_XAS* (dst, src, imm)
+        INSTR_CBRANCH / INSTR_UBRANCH
         INSTR_HALT
 
         Here INSTR_XAS* is one of the nine XOR/ADD/SUB opcodes and INSTR_MUL
         is one of the three MUL opcodes.
         The branch instruction, if taken, jumps to the start of the program.
+        Every program uses INSTR_CBRANCH, except for the last program in the
+        list, which uses INSTR_UBRANCH to ensure that BC is zero at the end
+        of the phase.
 
         Eight instructions have a dst register. Destinations are selected
         as a random permutation of R0-R7.
@@ -429,14 +433,15 @@ static void program_generate(siphash_rng* gen, hashwx_program* program) {
     uint32_t dst_select[7];
 
     /* opcodes */
-    program->code[0].opcode = INSTR_RMCG;
-    program->code[1].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[0]);
-    program->code[2].opcode = gen_mul_opcode(hashwx_rng_next(gen), &dst_select[1]);
-    program->code[3].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[2]);
-    program->code[4].opcode = gen_mul_opcode(hashwx_rng_next(gen), &dst_select[3]);
-    program->code[5].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[4]);
-    program->code[6].opcode = gen_mul_opcode(hashwx_rng_next(gen), &dst_select[5]);
-    program->code[7].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[6]);
+    program->code[0].opcode = INSTR_STORE;
+    program->code[1].opcode = INSTR_RMCG;
+    program->code[2].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[0]);
+    program->code[3].opcode = gen_mul_opcode(hashwx_rng_next(gen), &dst_select[1]);
+    program->code[4].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[2]);
+    program->code[5].opcode = gen_mul_opcode(hashwx_rng_next(gen), &dst_select[3]);
+    program->code[6].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[4]);
+    program->code[7].opcode = gen_mul_opcode(hashwx_rng_next(gen), &dst_select[5]);
+    program->code[8].opcode = gen_xas_opcode(hashwx_rng_next(gen), &dst_select[6]);
 
     /* instruction destination registers */
     uint32_t dst[8];
@@ -448,23 +453,23 @@ static void program_generate(siphash_rng* gen, hashwx_program* program) {
 
     /* instruction immediate values */
     for (int i = 0; i < 8; ++i) {
-        program->code[i].dst = dst[i];
-        program->code[i].src = src[i];
-        program->code[i].imm = gen_imm(program->code[i].opcode, hashwx_rng_next(gen));
+        program->code[i + 1].dst = dst[i];
+        program->code[i + 1].src = src[i];
+        program->code[i + 1].imm = gen_imm(program->code[i + 1].opcode, hashwx_rng_next(gen));
     }
 
-    /* insert branch */
-    program->code[8] = program->code[7];
-    program->code[7].opcode = INSTR_BRANCH;
+    /* branch */
+    program->code[9].opcode = is_last ? INSTR_UBRANCH : INSTR_CBRANCH;
 
     /* halt */
-    program->code[9].opcode = INSTR_HALT;
+    program->code[10].opcode = INSTR_HALT;
 }
 
 void hashwx_program_list_generate(const siphash_key* key, hashwx_program_list* program_list) {
     siphash_rng gen;
     hashwx_rng_init(&gen, key, (uint64_t)-1);
-    for (int i = 0; i < HASHWX_NUM_PROGRAMS; ++i) {
-        program_generate(&gen, &program_list->prog[i]);
+    for (int i = 0; i < HASHWX_NUM_PROGRAMS - 1; ++i) {
+        program_generate(&gen, &program_list->prog[i], false);
     }
+    program_generate(&gen, &program_list->prog[HASHWX_NUM_PROGRAMS - 1], true);
 }

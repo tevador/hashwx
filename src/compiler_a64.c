@@ -29,7 +29,7 @@
         x10     = 9
         x11     = 33
         x12     = R8
-        x13     = R9
+        x13     = repeat counter
         x14-x17 = temporary
 
     Note: The emitted aarch64 code is optimized for the A53 dual-issue
@@ -40,7 +40,7 @@
 */
 
 static const uint8_t code_prologue[] = {
-    0x0c, 0x34, 0x44, 0xa9, /* ldp x12, x13, [x0, #64] */
+    0x0c, 0x20, 0x40, 0xf9, /* ldr x12, [x0, #64] */
     0xe8, 0x03, 0x00, 0xaa, /* mov x8, x0 */
     0x06, 0x1c, 0x43, 0xa9, /* ldp x6, x7, [x0, #48] */
     0x04, 0x14, 0x42, 0xa9, /* ldp x4, x5, [x0, #32] */
@@ -53,20 +53,19 @@ static const uint8_t code_prologue[] = {
 
 static const uint8_t code_epilogue[] = {
     0x06, 0x1d, 0x03, 0xa9, /* stp x6, x7, [x8, #48] */
-    0xff, 0x03, 0x20, 0x91, /* add sp, sp, 2048 */
+    0xff, 0x13, 0x40, 0x91, /* add sp, sp, 16384 */
     0x04, 0x15, 0x02, 0xa9, /* stp x4, x5, [x8, #32] */
     0x02, 0x0d, 0x01, 0xa9, /* stp x2, x3, [x8, #16] */
     0x00, 0x05, 0x00, 0xa9, /* stp x0, x1, [x8, #0] */
     0xc0, 0x03, 0x5f, 0xd6, /* ret */
 };
 
-static const uint8_t code_branch[] = {
-    0xdf, 0x01, 0x7b, 0xf2, /* tst x14, 32 */
-    0x29, 0x15, 0x89, 0x9a, /* cinc x9, x9, eq */
-};
-
 static const uint8_t code_clear_bc[] = {
     0x09, 0x00, 0x80, 0xd2, /* mov x9, 0 */
+};
+
+static const uint8_t code_set_rc[] = {
+    0x8d, 0x00, 0x80, 0xd2, /* mov x13, 4 */
 };
 
 static uint8_t* emit_mul(uint8_t* pos, uint32_t dst, uint32_t src) {
@@ -125,14 +124,11 @@ static const uint32_t premul_tpls[3][3] = {
     { 0x91000400, 0x91002400, 0x91008400 }, /* add */
 };
 
-static const uint32_t store_pair[7] = {
-    0xa9020be3, /* stp x3, x2, [sp, #32] */
-    0xa90113e5, /* stp x5, x4, [sp, #16] */
-    0xa9001be7, /* stp x7, x6, [sp, #0] */
-    0xa90303e1, /* stp x1, x0, [sp, #48] */
-    0xa9020be3, /* stp x3, x2, [sp, #32] */
-    0xa90113e5, /* stp x5, x4, [sp, #16] */
-    0xa9001be7, /* stp x7, x6, [sp, #0] */
+static const uint8_t store_all[] = {
+    0xe1, 0x03, 0x03, 0xa9, /* stp x1, x0, [sp, #48] */
+    0xe3, 0x0b, 0x02, 0xa9, /* stp x3, x2, [sp, #32] */
+    0xe5, 0x13, 0x01, 0xa9, /* stp x5, x4, [sp, #16] */
+    0xe7, 0x1b, 0x00, 0xa9, /* stp x7, x6, [sp, #0] */
 };
 
 static uint8_t* emit_premul(uint8_t* pos, const instruction* isn) {
@@ -182,142 +178,151 @@ static uint8_t* emit_ldr_sp(uint8_t* pos, uint32_t dst) {
     return pos;
 }
 
-static uint8_t* emit_and_2040(uint8_t* pos, uint32_t dst, uint32_t src) {
-    /* and dst, src, 2040 */
-    EMIT_ISN(pos, 0x927d1c00 | (src << 5) | (dst));
+static uint8_t* emit_and_16376(uint8_t* pos, uint32_t dst, uint32_t src) {
+    /* and dst, src, 16376 */
+    EMIT_ISN(pos, 0x927d2800 | (src << 5) | (dst));
     return pos;
 }
 
+static uint8_t* emit_bne(uint8_t* pos, uint8_t* target) {
+    uint32_t offset = (uint32_t)(target - pos);
+    offset &= 0x1ffffc;
+    EMIT_ISN(pos, 0x54000001 | (offset << 3));
+    return pos;
+}
+
+static uint8_t* emit_repeat_loop(uint8_t* pos, uint8_t* target) {
+    /* subs x13, x13, 1 */
+    EMIT_ISN(pos, 0xf10005ad);
+    return emit_bne(pos, target);
+}
+
+static uint8_t* emit_branch(uint8_t* pos, const hashwx_program* program, uint8_t* target) {
+    uint32_t tst = program->code[9].opcode == INSTR_UBRANCH
+        ?
+        0xf27b013f  /* tst x9, 32 */
+        :
+        0xf27b01df; /* tst x14, 32 */
+    EMIT_ISN(pos, tst);
+    /* cinc x9, x9, eq */
+    EMIT_ISN(pos, 0x9a891529);
+    /* b.eq target */
+    return emit_beq(pos, target);
+}
+
 static uint8_t* compile_program_reg(const hashwx_program* program, uint8_t* pos) {
+    uint8_t* target = pos;
     /* sub sp, sp, 64 */
     EMIT_ISN(pos, 0xd10103ff);
-    uint8_t* target = pos;
-    /* mul dst0, dst0, src0 */
-    pos = emit_mul(pos, program->code[0].dst, program->code[0].src + 4);
-    /* ror/asr/lsr dst1, dst1, imm1 */
-    pos = emit_pre_xas(pos, &program->code[1]);
-    /* mov x14, src1 */
-    pos = emit_mov(pos, 14, program->code[1].src);
-    /* orr/eor/add dst2, dst2, imm2 */
-    pos = emit_premul(pos, &program->code[2]);
-    /* eor/add/sub dst1, dst1, x14 */
-    pos = emit_xas(pos, &program->code[1], 14);
-    /* mul dst2, dst2, src2 */
-    pos = emit_mul(pos, program->code[2].dst, program->code[2].src);
-    /* ror/asr/lsr dst3, dst3, imm3 */
-    pos = emit_pre_xas(pos, &program->code[3]);
-    /* ror dst0, dst0, imm0 */
-    pos = emit_ror(pos, program->code[0].dst, program->code[0].imm);
-    /* eor/add/sub dst3, dst3, src3 */
-    pos = emit_xas(pos, &program->code[3], program->code[3].src);
-    /* orr/eor/add dst4, dst4, imm4 */
-    pos = emit_premul(pos, &program->code[4]);
-    /* mul dst4, dst4, src4 */
-    pos = emit_mul(pos, program->code[4].dst, program->code[4].src);
-    /* ror/asr/lsr dst5, dst5, imm5 */
-    pos = emit_pre_xas(pos, &program->code[5]);
-    /* orr x14, dst0, x9 */
-    pos = emit_orr(pos, 14, program->code[0].dst, 9);
-    /* eor/add/sub dst5, dst5, src5 */
-    pos = emit_xas(pos, &program->code[5], program->code[5].src);
-    /* orr/eor/add dst6, dst6, imm6 */
-    pos = emit_premul(pos, &program->code[6]);
-    /*
-        tst x14, 32
-        cinc x9, x9, eq
-    */
-    EMIT(pos, code_branch);
-    /* mul dst6, dst6, src6 */
-    pos = emit_mul(pos, program->code[6].dst, program->code[6].src);
-    /* b.eq */
-    pos = emit_beq(pos, target);
-    uint32_t pair_idx = program->code[8].dst / 2;
-    /* stp reg0, reg1, [sp, #pos0] */
-    EMIT_ISN(pos, store_pair[pair_idx]);
+    /* STORE: save R0-R7 */
+    EMIT(pos, store_all);
+    /* mul dst1, dst1, src1 */
+    pos = emit_mul(pos, program->code[1].dst, program->code[1].src + 4);
+    /* ror/asr/lsr dst2, dst2, imm2 */
+    pos = emit_pre_xas(pos, &program->code[2]);
+    /* mov x14, src2 */
+    pos = emit_mov(pos, 14, program->code[2].src);
+    /* orr/eor/add dst3, dst3, imm3 */
+    pos = emit_premul(pos, &program->code[3]);
+    /* eor/add/sub dst2, dst2, x14 */
+    pos = emit_xas(pos, &program->code[2], 14);
+    /* mul dst3, dst3, src3 */
+    pos = emit_mul(pos, program->code[3].dst, program->code[3].src);
+    /* ror/asr/lsr dst4, dst4, imm4 */
+    pos = emit_pre_xas(pos, &program->code[4]);
+    /* ror dst1, dst1, imm1 */
+    pos = emit_ror(pos, program->code[1].dst, program->code[1].imm);
+    /* eor/add/sub dst4, dst4, src4 */
+    pos = emit_xas(pos, &program->code[4], program->code[4].src);
+    /* orr/eor/add dst5, dst5, imm5 */
+    pos = emit_premul(pos, &program->code[5]);
+    /* mul dst5, dst5, src5 */
+    pos = emit_mul(pos, program->code[5].dst, program->code[5].src);
+    /* ror/asr/lsr dst6, dst6, imm6 */
+    pos = emit_pre_xas(pos, &program->code[6]);
+    /* orr x14, dst1, x9 */
+    pos = emit_orr(pos, 14, program->code[1].dst, 9);
+    /* eor/add/sub dst6, dst6, src6 */
+    pos = emit_xas(pos, &program->code[6], program->code[6].src);
+    /* orr/eor/add dst7, dst7, imm7 */
+    pos = emit_premul(pos, &program->code[7]);
+    /* mul dst7, dst7, src7 */
+    pos = emit_mul(pos, program->code[7].dst, program->code[7].src);
     /* ror/asr/lsr dst8, dst8, imm8 */
     pos = emit_pre_xas(pos, &program->code[8]);
-    /* stp reg2, reg3, [sp, #pos1] */
-    EMIT_ISN(pos, store_pair[pair_idx + 1]);
     /* eor/add/sub dst8, dst8, src8 */
     pos = emit_xas(pos, &program->code[8], program->code[8].src);
-    /* stp reg4, reg5, [sp, #pos2] */
-    EMIT_ISN(pos, store_pair[pair_idx + 2]);
-    /* stp reg6, reg7, [sp, #pos3] */
-    EMIT_ISN(pos, store_pair[pair_idx + 3]);
+    /* branch */
+    pos = emit_branch(pos, program, target);
     return pos;
 }
 
 static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos) {
     uint8_t* target = pos;
-    /* and x15, src1, 2040 */
-    pos = emit_and_2040(pos, 15, program->code[1].src);
+    /* and x15, src2, 16376 */
+    pos = emit_and_16376(pos, 15, program->code[2].src);
     /* ldr x15, [sp, x15] */
     pos = emit_ldr_sp(pos, 15);
-    /* ror/asr/lsr dst1, dst1, imm1 */
-    pos = emit_pre_xas(pos, &program->code[1]);
-    /* mul dst0, dst0, src0 */
-    pos = emit_mul(pos, program->code[0].dst, program->code[0].src + 4);
-    /* eor/add/sub dst1, dst1, x15 */
-    pos = emit_xas(pos, &program->code[1], 15);
-    /* and x16, src2, 2040 */
-    pos = emit_and_2040(pos, 16, program->code[2].src);
+    /* ror/asr/lsr dst2, dst2, imm2 */
+    pos = emit_pre_xas(pos, &program->code[2]);
+    /* mul dst1, dst1, src1 */
+    pos = emit_mul(pos, program->code[1].dst, program->code[1].src + 4);
+    /* eor/add/sub dst2, dst2, x15 */
+    pos = emit_xas(pos, &program->code[2], 15);
+    /* and x16, src3, 16376 */
+    pos = emit_and_16376(pos, 16, program->code[3].src);
     /* ldr x16, [sp, x16] */
     pos = emit_ldr_sp(pos, 16);
-    /* and x17, src3, 2040 */
-    pos = emit_and_2040(pos, 17, program->code[3].src);
+    /* and x17, src4, 16376 */
+    pos = emit_and_16376(pos, 17, program->code[4].src);
     /* ldr x17, [sp, x17] */
     pos = emit_ldr_sp(pos, 17);
-    /* orr/eor/add dst2, dst2, imm2 */
-    pos = emit_premul(pos, &program->code[2]);
-    /* ror/asr/lsr dst3, dst3, imm3 */
-    pos = emit_pre_xas(pos, &program->code[3]);
-    /* ror dst0, dst0, imm0 */
-    pos = emit_ror(pos, program->code[0].dst, program->code[0].imm);
-    /* mul dst2, dst2, x16 */
-    pos = emit_mul(pos, program->code[2].dst, 16);
-    /* eor/add/sub dst3, dst3, x17 */
-    pos = emit_xas(pos, &program->code[3], 17);
-    /* and x16, src4, 2040 */
-    pos = emit_and_2040(pos, 16, program->code[4].src);
+    /* orr/eor/add dst3, dst3, imm3 */
+    pos = emit_premul(pos, &program->code[3]);
+    /* ror/asr/lsr dst4, dst4, imm4 */
+    pos = emit_pre_xas(pos, &program->code[4]);
+    /* ror dst1, dst1, imm1 */
+    pos = emit_ror(pos, program->code[1].dst, program->code[1].imm);
+    /* mul dst3, dst3, x16 */
+    pos = emit_mul(pos, program->code[3].dst, 16);
+    /* eor/add/sub dst4, dst4, x17 */
+    pos = emit_xas(pos, &program->code[4], 17);
+    /* and x16, src5, 16376 */
+    pos = emit_and_16376(pos, 16, program->code[5].src);
     /* ldr x16, [sp, x16] */
     pos = emit_ldr_sp(pos, 16);
-    /* and x17, src5, 2040 */
-    pos = emit_and_2040(pos, 17, program->code[5].src);
+    /* and x17, src6, 16376 */
+    pos = emit_and_16376(pos, 17, program->code[6].src);
     /* ldr x17, [sp, x17] */
     pos = emit_ldr_sp(pos, 17);
-    /* orr/eor/add dst4, dst4, imm4 */
-    pos = emit_premul(pos, &program->code[4]);
-    /* ror/asr/lsr dst5, dst5, imm5 */
-    pos = emit_pre_xas(pos, &program->code[5]);
-    /* orr x14, dst0, x9 */
-    pos = emit_orr(pos, 14, program->code[0].dst, 9);
-    /* mul dst4, dst4, x16 */
-    pos = emit_mul(pos, program->code[4].dst, 16);
-    /* eor/add/sub dst5, dst5, x17 */
-    pos = emit_xas(pos, &program->code[5], 17);
-    /* and x16, src6, 2040 */
-    pos = emit_and_2040(pos, 16, program->code[6].src);
+    /* orr/eor/add dst5, dst5, imm5 */
+    pos = emit_premul(pos, &program->code[5]);
+    /* ror/asr/lsr dst6, dst6, imm6 */
+    pos = emit_pre_xas(pos, &program->code[6]);
+    /* orr x14, dst1, x9 */
+    pos = emit_orr(pos, 14, program->code[1].dst, 9);
+    /* mul dst5, dst5, x16 */
+    pos = emit_mul(pos, program->code[5].dst, 16);
+    /* eor/add/sub dst6, dst6, x17 */
+    pos = emit_xas(pos, &program->code[6], 17);
+    /* and x16, src7, 16376 */
+    pos = emit_and_16376(pos, 16, program->code[7].src);
     /* ldr x16, [sp, x16] */
     pos = emit_ldr_sp(pos, 16);
-    /* and x17, src8, 2040 */
-    pos = emit_and_2040(pos, 17, program->code[8].src);
+    /* and x17, src8, 16376 */
+    pos = emit_and_16376(pos, 17, program->code[8].src);
     /* ldr x17, [sp, x17] */
     pos = emit_ldr_sp(pos, 17);
-    /* orr/eor/add dst6, dst6, imm6 */
-    pos = emit_premul(pos, &program->code[6]);
-    /*
-        tst x14, 32
-        cinc x9, x9, eq
-    */
-    EMIT(pos, code_branch);
-    /* mul dst6, dst6, x16 */
-    pos = emit_mul(pos, program->code[6].dst, 16);
-    /* b.eq */
-    pos = emit_beq(pos, target);
+    /* orr/eor/add dst7, dst7, imm7 */
+    pos = emit_premul(pos, &program->code[7]);
+    /* mul dst7, dst7, x16 */
+    pos = emit_mul(pos, program->code[7].dst, 16);
     /* ror/asr/lsr dst8, dst8, imm8 */
     pos = emit_pre_xas(pos, &program->code[8]);
     /* eor/add/sub dst8, dst8, x17 */
     pos = emit_xas(pos, &program->code[8], 17);
+    /* branch */
+    pos = emit_branch(pos, program, target);
     return pos;
 }
 
@@ -327,18 +332,27 @@ void hashwx_compile_a64(uint8_t* code, const hashwx_program_list* program_list) 
     uint8_t* pos = code;
     EMIT(pos, code_prologue);
 
+    /* repeat 4x with BC=32 (memory write) */
+    EMIT(pos, code_set_rc);
+    uint8_t* reg_phase_start = pos;
+    EMIT(pos, code_clear_bc);
     for (uint32_t i = 0; i < HASHWX_NUM_PROGRAMS; ++i) {
         pos = compile_program_reg(&program_list->prog[i], pos);
     }
+    pos = emit_repeat_loop(pos, reg_phase_start);
 
+    /* repeat 4x with BC=32 (memory read) */
+    EMIT(pos, code_set_rc);
+    uint8_t* mem_phase_start = pos;
     EMIT(pos, code_clear_bc);
-
     for (uint32_t i = 0; i < HASHWX_NUM_PROGRAMS; ++i) {
         pos = compile_program_mem(&program_list->prog[i], pos);
     }
+    pos = emit_repeat_loop(pos, mem_phase_start);
 
     EMIT(pos, code_epilogue);
     hashwx_vm_rx(code, HASHWX_CODE_SIZE);
+    assert(pos - code <= HASHWX_CODE_SIZE);
 #ifdef __GNUC__
     __builtin___clear_cache((char*)code, (char*)pos);
 #endif

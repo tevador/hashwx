@@ -74,9 +74,9 @@ make
 
 ## Performance
 
-HashWX was designed for maximum GPU resistance and fast verification. Generating a hash function from a seed
-takes about 20 000 CPU cycles and a 64-bit nonce can be hashed in under 2400 cycles in compiled
-mode (interpreted mode is about 10x slower). These performance numbers were measured on an AMD Zen 2 CPU.
+HashWX was designed for maximum GPU resistance and fast verification.
+Generating a hash function from a seed takes about 20 000 CPU cycles and a 64-bit nonce can be hashed in about 10 000 cycles in compiled mode (interpreted mode is about 10x slower).
+These performance numbers were measured on an AMD Zen 2 CPU.
 
 A benchmark executable is included:
 ```
