@@ -102,6 +102,30 @@ static FORCE_INLINE uint64_t platform_load64(const void* src) {
 #endif
 }
 
+/* store in little endian format */
+static FORCE_INLINE void platform_store64(void* dst, uint64_t w) {
+#if defined(PLATFORM_LE)
+    memcpy(dst, &w, sizeof w);
+#else
+    uint8_t* p = (uint8_t*)dst;
+    *p++ = (uint8_t)w;
+    w >>= 8;
+    *p++ = (uint8_t)w;
+    w >>= 8;
+    *p++ = (uint8_t)w;
+    w >>= 8;
+    *p++ = (uint8_t)w;
+    w >>= 8;
+    *p++ = (uint8_t)w;
+    w >>= 8;
+    *p++ = (uint8_t)w;
+    w >>= 8;
+    *p++ = (uint8_t)w;
+    w >>= 8;
+    *p++ = (uint8_t)w;
+#endif
+}
+
 double platform_wall_clock(void);
 
 #endif /* PLATFORM_H */

@@ -8,7 +8,7 @@ set(HASHWX_VERSION_MINOR 0)
 set(HASHWX_VERSION_PATCH 0)
 set(HASHWX_VERSION_STR "${HASHWX_VERSION}.${HASHWX_VERSION_MINOR}.${HASHWX_VERSION_PATCH}")
 
-project(hashwx)
+project(hashwx C)
 
 set(hashwx_sources
 src/compiler.c

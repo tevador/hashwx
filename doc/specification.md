@@ -1,6 +1,6 @@
-# HashWX
+# HashWX specification
 
-This documents describes the HashWX algorithm. The document is structured as follows:
+This document describes the HashWX algorithm. The document is structured as follows:
 
 * Section 1 describes the virtual machine that's internally used by HashWX.
 * Section 2 describes how HashWX instances are generated from a seed.
@@ -24,7 +24,7 @@ The VM has a total of 14 registers. The first 9 registers (R0-R8) are arithmetic
 
 #### 1.2.1 Arithmetic registers
 
-The registers R0-R8 are used for arithmetic operations. Their size is 64 bits. Registers R0-R7 are read-write registers, while R8 is a read-only registers used by the `RMCG` instruction.
+The registers R0-R8 are used for arithmetic operations. Their size is 64 bits. Registers R0-R7 are read-write registers, while R8 is a read-only register used by the `RMCG` instruction.
 
 #### 1.2.2 Control registers
 
@@ -34,7 +34,7 @@ This register holds the index of the next instruction in the program buffer to b
 
 ##### 1.2.2.2 Branch counter (BC)
 
-The branch counter holds the maximum number of branches the VM can take. Whenever a `BRANCH` instruction writes to the program counter, the BC register is decremented. When the value of BC reaches zero, no further branches can be taken.
+The branch counter holds the maximum number of branches the VM can take. Whenever a branch instruction writes to the program counter, the BC register is decremented. When the value of BC reaches zero, no further branches can be taken.
 
 ##### 1.2.2.3 Branch flag (BF)
 
@@ -50,7 +50,7 @@ This register holds the memory address where the STORE instruction writes to mem
 
 ### 1.3 Memory
 
-The VM has 16384 bytes of memory. The STORE instruction can write to memory if MF=0 and other instructions can read from memory if MF=1.
+The VM has 16392 bytes of memory. The STORE instruction can write to memory if MF=0 and other instructions can read from memory if MF=1.
 
 ### 1.4 Instruction set
 
@@ -61,9 +61,9 @@ Every instruction in the program buffer consists of:
 1. An opcode that determines what the instruction does.
 2. A destination register `dst`, if applicable.
 3. A source register `src`, if applicable.
-4. An immediate value `imm`, if applicable. The maximum immediate size is 7 bits.
+4. An immediate value `imm`, if applicable. The maximum immediate size is 6 bits.
 
-The actual source operand used by an instruction depends on the value of the Memory flag. If MF=0, the register value is used directly as the source operand. If MF=1, the value in the register (modulo 16384) is used to load an 8-byte aligned value from the memory.
+The actual source operand used by an instruction depends on the value of the Memory flag. If MF=0, the register value is used directly as the source operand. If MF=1, the value in the register (modulo 16384) is used to load a 64-bit value from the memory. The load address is 1-byte aligned. Operands are read in little-endian byte order.
 
 #### 1.4.2 Instruction listing
 
@@ -71,7 +71,7 @@ The actual source operand used by an instruction depends on the value of the Mem
 * `>>` denotes an arithmetic (signed) right shift
 * `>>>` denotes a logical (unsigned) right shift
 * `>>>>` denotes circular right shift (rotation)
-* the source operand is evaluated as: `[src] = MF ? memory[src & 16376] : src`
+* the source operand is evaluated as: `[src] = MF ? load64(src % 16384) : src`
 * the RMCG instruction always uses a register source operand
 
 *Table 1.4.2 - HashWX instructions*
@@ -91,9 +91,9 @@ The actual source operand used by an instruction depends on the value of the Mem
 |10|XORLSR|`dst=(dst>>>imm)^[src]`|R0-R7|R0-R7|`1-3`|
 |11|ADDLSR|`dst=(dst>>>imm)+[src]`|R0-R7|R0-R7|`1-3`|
 |12|SUBLSR|`dst=(dst>>>imm)-[src]`|R0-R7|R0-R7|`1-3`|
-|13|CBRANCH|`if(BC && !BF){BC--;PC=0;}`|||
-|14|UBRANCH|`if(BC){BC--;PC=0;}`|||
-|15|STORE|`if(!MF){SP=SP-64;store(SP, [R7..R0]);}`|||
+|13|CBRANCH|`if(BC && !BF){BC--;PC=0;}`||||
+|14|UBRANCH|`if(BC){BC--;PC=0;}`||||
+|15|STORE|`if(!MF){SP=SP-64;store512(SP, [R7..R0]);}`||||
 |16|HALT||||||
 
 ##### 1.4.2.1 MULOR
@@ -142,7 +142,7 @@ This instruction performs a conditional branch. The branch is taken if BC is non
 This instruction performs an unconditional branch. The branch is taken as long as BC is nonzero. If the branch is taken, the BC register is decremented by 1 and the VM jumps to the first instruction in the program buffer.
 
 ##### 1.4.2.16 STORE
-If MF=0, this instruction decreases the value of SP by 64 and then stores R7 at the address of SP, R6 at the address SP+8, etc. R0 is stored at SP+56. If MF=1, this instruction is a no-op.
+If MF=0, this instruction decreases the value of SP by 64 and then stores R7 at the address of SP, R6 at the address SP+8, etc. R0 is stored at SP+56. The stores are done in little-endian byte order. If MF=1, this instruction is a no-op.
 
 ##### 1.4.2.17 HALT
 This instruction stops the VM. No register values are affected.
@@ -155,8 +155,8 @@ The HashWX instance generation procedure takes a 32-byte seed as input and produ
 
 Siphash keys are used to initialize the Siphash generator, which is a pseudorandom number generator described in Appendix A. The 32-byte seed is split into 2 Siphash keys:
 
-1. The first Siphash key is used to generate random 32 programs. The generator is initialized with a salt value of -1.
-2. The second Siphash key is copied into the HashWX instance and is used during hash calculation.
+1. The first Siphash key (seed bytes 0-15) is used to generate 32 random programs. The generator is initialized with a salt value of `0xffffffffffffffff`.
+2. The second Siphash key (seed bytes 16-31) is copied into the HashWX instance and is used during hash calculation.
 
 ### 2.2 Program structure
 
@@ -167,28 +167,34 @@ Each HashWX program consists of 11 instructions and has the following structure:
 |index|opcode|arguments|
 |-----|------|---------|
 |0|STORE||
-|1|RMCG|dst, src, imm|
-|2|XAS*|dst, src, imm|
-|3|MUL*|dst, src, imm|
-|4|XAS*|dst, src, imm|
-|5|MUL*|dst, src, imm|
-|6|XAS*|dst, src, imm|
-|7|MUL*|dst, src, imm|
-|8|XAS*|dst, src, imm|
-|9|*BRANCH||
+|1|RMCG|dst, imm|
+|2|(arithmetic)|dst, src, imm|
+|3|(arithmetic)|dst, src, imm|
+|4|(arithmetic)|dst, src, imm|
+|5|(arithmetic)|dst, src, imm|
+|6|(arithmetic)|dst, src, imm|
+|7|(arithmetic)|dst, src, imm|
+|8|(arithmetic)|dst, src, imm|
+|9|(branch)||
 |10|HALT||
 
-MUL* refers to one of the 3 MUL opcodes (0-2), XAS* refers to one of the 9 XOR/ADD/SUB opcodes (4-12) and *BRANCH refers to one fo the two branch opcodes (13-14) from table 1.4.2.
+The main program body (indexes 2-8) consists of 7 arithmetic instructions, which include opcodes 0-2 and 4-12 from table 1.4.2. The branch at index 9 is one of the two branch opcodes (13-14) from table 1.4.2.
 
 ### 2.3 Program generation
 
 Each random program is generated from 16 pseudorandom 64-bit numbers output from the Siphash generator. In this section, these 16 numbers are referred to as `gen[0]` to `gen[15]`.
 
-#### 2.3.1 Opcodes
+#### 2.3.1 Arithmetic sequence
 
-The XAS instructions at indexes 2, 4, 6 and 8 can have one of 9 possible opcodes. These opcodes are selected from the lookup table 2.3.1.1 based on the least significant 32 bits of `gen[0]`, `gen[2]`, `gen[4]` and `gen[6]`.
+Each HashWX program contains one of 35 possible arithmetic sequences of MUL and XAS opcode groups at indexes 2-8. There are always exactly 3 MUL opcodes (0-2) and 4 XAS opcodes (4-12). The arithmetic sequence index is calculated as `gen[7] % 35`. The arithmetic sequences are listed in Appendix B.
 
-*Table 2.3.1.1 - XAS lookup table*
+#### 2.3.2 Opcodes
+
+For each slot from the selected arithmetic sequence, an opcode needs to be selected. Opcode selection uses the low 32 bits of `gen[0]` to `gen[6]`.
+
+If the i-th position in the arithmetic sequence is a XAS instruction (marked as "X" in Appendix B), it can have one of 9 possible opcodes. The opcode is selected from the lookup table 2.3.2.1 based on the least significant 32 bits of `gen[i]`.
+
+*Table 2.3.2.1 - XAS lookup table*
 
 |`(gen[i] & 0xffffffff) % 9`|opcode|
 |-----|------|
@@ -202,9 +208,9 @@ The XAS instructions at indexes 2, 4, 6 and 8 can have one of 9 possible opcodes
 |7|ADDLSR|
 |8|SUBLSR|
 
-The MUL instructions at indexes 3, 5 and 7 can have one of 3 possible opcodes. These opcodes are selected based on the least significant 32 bits of `gen[1]`, `gen[3]` and `gen[5]` as shown in table 2.3.1.2
+If the i-th position in the arithmetic sequence is a MUL instruction (marked as "M" in Appendix B), it can have one of 3 possible opcodes. The opcode is selected based on the least significant 32 bits of `gen[i]` as shown in table 2.3.2.2
 
-*Table 2.3.1.2 - MUL lookup table*
+*Table 2.3.2.2 - MUL lookup table*
 
 |`(gen[i] & 0xffffffff) % 3`|opcode|
 |-----|------|
@@ -212,32 +218,44 @@ The MUL instructions at indexes 3, 5 and 7 can have one of 3 possible opcodes. T
 |1|MULXOR|
 |2|MULADD|
 
-The *BRANCH instructions are not selected at random. The first 31 programs use the CBRANCH instruction. The last program uses UBRANCH to ensure that the value of BC is zero at the end.
+The opcode for the branch instruction at index 9 is not selected at random. The first 31 programs always use the CBRANCH instruction. The last program uses UBRANCH to ensure that the value of BC is zero at the end.
 
-#### 2.3.2 Destinations
+#### 2.3.3 Destinations
 
-A total of 8 instructions in each program need a destination register (indexes 1-8). Destinations are selected by taking a random permutation of the registers R0-R7. The random permutation is produced using the Fisher-Yates shuffle with the upper 32 bits of `gen[0]` to `gen[6]` used for index selection. The Fisher-Yates shuffle algorithm is described in Appendix B.
+A total of 8 instructions in each program need a destination register (indexes 1-8). Destinations are selected by taking a random permutation of the registers R0-R7. The random permutation is produced using the Fisher-Yates shuffle with the upper 32 bits of `gen[0]` to `gen[6]` used for index selection. The Fisher-Yates shuffle algorithm is described in Appendix C.
 
-#### 2.3.3 Sources
+#### 2.3.4 Sources
 
-A total of 7 instructions in each program need a source register from the range R0-R7 (indexes 2-8). These sources are selected as one of 625 permitted permutations of the destinations. The source permutation index is calculated as `gen[7] % 625`. The permitted source permutations are listed in Appendix C.
+The 7 instructions from the arithmetic sequence also need a source register. These sources are selected as one of 512 permitted permutations of the destinations. The source permutation index is calculated as `gen[7] % 512`. The permitted source permutations are listed in Appendix D. 
+
+The source permutation is a permutation of the destinations, so it needs to be combined with the destination permutation to get actual register indexes, i.e. `src[i] = dst[1+perm[i-1]]` for instruction index `i = 2..8` and the selected permutation `perm`.
 
 The RMCG instruction at index 1 always takes R8 as its source operand.
 
-#### 2.3.4 Immediates
+Note: The generator output `gen[7]` is used twice (in § 2.3.1 and here). The resulting random values are independent because `gcd(35,512) = 1`.
 
-A total of 8 instructions in each program need an immediate value (indexes 1-8). Immediates are selected from `gen[8]` to `gen[15]` modulo the number of possible immediate values permitted for a given opcode. 
+#### 2.3.5 Immediates
+
+A total of 8 instructions in each program need an immediate value (indexes 1-8). Immediates are selected from `gen[8]` to `gen[15]` modulo the number of possible immediate values permitted for a given opcode (see Table 2.3.5.1).
+
+*Table 2.3.5.1 - Immediates*
+
+|opcode at index `i`|immediate value|
+|-------------------|---------------|
+| 0-2               |`{1,9,33}[gen[7+i] % 3]`|
+|3-6                |`1 + (gen[7+i] % 63)`|
+|7-12               |`1 + (gen[7+i] % 3)`|
 
 ## 3. HashWX calculation
 
-Given a HashWX instance and a nonce value, the hash value calculation consists of the following phases:
+Given a HashWX instance and a 64-bit nonce value, the hash value calculation consists of the following phases:
 
 1. Register initialization phase
 2. Memory write phase
 3. Memory read phase
 4. Finalization phase
 
-The whole algorithm in pseudocode is described in Appendix D.
+The whole algorithm in pseudocode is described in Appendix E.
 
 ### 3.1 Register initialization
 
@@ -247,9 +265,9 @@ The register R8 is initialized as `R8 = ((R0 ^ R4) & -8) | 3`.
 
 ### 3.2 Memory write phase
 
-At the beginning of this phase, the Memory flag is set to 0 and the Store pointer is set to 16384. Then the following is repeated 4 times: The VM Branch counter register is set to 32 and the 32 HashWX programs are executed sequentially. No register values are modified between the VM executions apart from the Program counter, which is reset to 0 at the beginning of each program.
+At the beginning of this phase, the Memory flag is set to 0, the Store pointer is set to 16384 and the value of the R8 register is written at the address of SP in little endian byte order. Then the following is repeated 4 times: The VM Branch counter register is set to 32 and the 32 HashWX programs are executed sequentially. No register values are modified between the VM executions apart from the Program counter, which is reset to 0 at the beginning of each program.
 
-The memory write phase always executes exactly 256 STORE instructions, which exactly fills the VM memory. The final value of SP is 0.
+The memory write phase always executes exactly 256 STORE instructions, which exactly fill the remaining 16384 bytes of VM memory. The final value of SP is 0. The value of R8 stored at address 16384 is never overwritten by a STORE instruction and is only partially readable via unaligned loads at addresses 16377-16383.
 
 ### 3.3 Memory read phase
 
@@ -257,7 +275,7 @@ At the beginning of this phase, the Memory flag is set to 1. Then the following 
 
 ### 3.4 Finalization phase
 
-The final hash value is calculated from the values of registers R0-R8 after the memory read phase. First, two SipRounds are executed to mix registers R0-R3 and R4-R7 (SipRound is described in Appendix A.1). The final hash value is `R3 ^ R7 ^ R8`.
+The final hash value is calculated from the values of registers R0-R8 after the memory read phase. First, two SipRounds are executed to mix registers R0-R3 and R4-R7 (SipRound is described in Appendix A.1). The final 64-bit hash value is `R3 ^ R7 ^ R8`. Test vectors can be found in Appendix F.
 
 ## Appendix
 
@@ -290,7 +308,7 @@ function sipround(v0, v1, v2, v3):
 
 #### A.2 Generator initialization
 
-The Siphash generator is initialized with a 16-byte Siphash key and an 64-bit salt. The key is interpreted as two 64-bit integers `k0` and `k1` (in little endian format). The initial state is generated as follows:
+The Siphash generator is initialized with a 16-byte Siphash key and a 64-bit salt. The key is interpreted as two 64-bit integers `k0` and `k1` (in little endian format). The initial state is generated as follows:
 
 ```
 function rng_init(k0, k1, salt):
@@ -325,154 +343,201 @@ function rng_mix(k0, k1, v0, v1, v2, v3):
     return (v0, v1, v2, v3)
 ```
 
-### B. Fisher-Yates shuffle
+### B. Arithmetic sequences
 
-Fisher-Yates shuffle generates a random permutation of N elements using N-1 random numbers. In the case of HashWX, we have N=8 and the random numbers are `gen[0]` to `gen[6]`.
+Each HashWX program contains one of 35 arithmetic sequences at program indexes 2-8. The sequences are listed below (lexicographically sorted). "M" refers to one of the MUL opcodes and "X" refers to one of the XAS opcodes.
 
 ```
-function fisher_yates_shuffle(gen)
+MMMXXXX
+MMXMXXX
+MMXXMXX
+MMXXXMX
+MMXXXXM
+MXMMXXX
+MXMXMXX
+MXMXXMX
+MXMXXXM
+MXXMMXX
+MXXMXMX
+MXXMXXM
+MXXXMMX
+MXXXMXM
+MXXXXMM
+XMMMXXX
+XMMXMXX
+XMMXXMX
+XMMXXXM
+XMXMMXX
+XMXMXMX
+XMXMXXM
+XMXXMMX
+XMXXMXM
+XMXXXMM
+XXMMMXX
+XXMMXMX
+XXMMXXM
+XXMXMMX
+XXMXMXM
+XXMXXMM
+XXXMMMX
+XXXMMXM
+XXXMXMM
+XXXXMMM
+```
+
+### C. Fisher-Yates shuffle
+
+Fisher-Yates shuffle generates a random permutation of N elements using N-1 random numbers. In the case of HashWX, we have N=8 and the random numbers are `rnd[0]` to `rnd[6]`, which correspond to the high 32 bits of `gen[0]` to `gen[6]`.
+
+```
+function fisher_yates_shuffle(rnd)
     dst[0] = 0
     for i in [1..7]:
         dst[i] = i
-        j = gen[i - 1] % (i + 1)
+        j = rnd[i - 1] % (i + 1)
         dst[i] = dst[j]
         dst[j] = i
     return dst
 ```
 
-### C. Source permutations
+### D. Source permutations
 
-The permitted 625 source permutations are listed below (lexicographically sorted). The first element of the permutation is unused as there are only 7 source registers per program. The source permutation is a permutation of the destinations, so it needs to be combined with the destination permutation to get actual register indexes.
+The permitted 512 source permutations are listed below (lexicographically sorted). The first element of the permutation is unused as there are only 7 source registers per program. The source permutation is a permutation of the destinations, so it needs to be combined with the destination permutation to get actual register indexes.
+
+No permutation uses its own destination as its source, i.e. `perm[i] != i` for all `i = 1..7`.
 
 ```
-03145672 03146752 03147652 03415672 03416752
-03417652 03451672 03456172 03456712 03457612
-03461752 03465172 03465712 03467152 03471652
-03475612 03476152 03541672 03546172 03546712
-03547612 03641752 03645172 03645712 03647152
-03741652 03745612 03746152 04153672 04156372
-04156732 04157632 04163752 04165372 04165732
-04167352 04173652 04175632 04176352 04315672
-04316752 04317652 04351672 04356172 04356712
-04357612 04361752 04365172 04365712 04367152
-04371652 04375612 04376152 04513672 04516372
-04516732 04517632 04561372 04561732 04563172
-04563712 04567132 04567312 04571632 04573612
-04576132 04576312 04613752 04615372 04615732
-04617352 04651372 04651732 04653172 04653712
-04657132 04657312 04671352 04673152 04675132
-04675312 04713652 04715632 04716352 04751632
-04753612 04756132 04756312 04761352 04763152
-04765132 04765312 05143672 05146372 05146732
-05147632 05341672 05346172 05346712 05347612
-05413672 05416372 05416732 05417632 05461372
-05461732 05463172 05463712 05467132 05467312
-05471632 05473612 05476132 05476312 05641372
-05641732 05643172 05643712 05647132 05647312
-05741632 05743612 05746132 05746312 06143752
-06145372 06145732 06147352 06341752 06345172
-06345712 06347152 06413752 06415372 06415732
-06417352 06451372 06451732 06453172 06453712
-06457132 06457312 06471352 06473152 06475132
-06475312 06541372 06541732 06543172 06543712
-06547132 06547312 06741352 06743152 06745132
-06745312 07143652 07145632 07146352 07341652
-07345612 07346152 07413652 07415632 07416352
-07451632 07453612 07456132 07456312 07461352
-07463152 07465132 07465312 07541632 07543612
-07546132 07546312 07641352 07643152 07645132
-07645312 23145670 23146750 23147650 23415670
-23416750 23417650 23451670 23456170 23456710
-23457610 23461750 23465170 23465710 23467150
-23471650 23475610 23476150 23541670 23546170
-23546710 23547610 23641750 23645170 23645710
-23647150 23741650 23745610 23746150 24153670
-24156370 24156730 24157630 24163750 24165370
-24165730 24167350 24173650 24175630 24176350
-24315670 24316750 24317650 24351670 24356170
-24356710 24357610 24361750 24365170 24365710
-24367150 24371650 24375610 24376150 24513670
-24516370 24516730 24517630 24561370 24561730
-24563170 24563710 24567130 24567310 24571630
-24573610 24576130 24576310 24613750 24615370
-24615730 24617350 24651370 24651730 24653170
-24653710 24657130 24657310 24671350 24673150
-24675130 24675310 24713650 24715630 24716350
-24751630 24753610 24756130 24756310 24761350
-24763150 24765130 24765310 25143670 25146370
-25146730 25147630 25341670 25346170 25346710
-25347610 25413670 25416370 25416730 25417630
-25461370 25461730 25463170 25463710 25467130
-25467310 25471630 25473610 25476130 25476310
-25641370 25641730 25643170 25643710 25647130
-25647310 25741630 25743610 25746130 25746310
-26143750 26145370 26145730 26147350 26341750
-26345170 26345710 26347150 26413750 26415370
-26415730 26417350 26451370 26451730 26453170
-26453710 26457130 26457310 26471350 26473150
-26475130 26475310 26541370 26541730 26543170
-26543710 26547130 26547310 26741350 26743150
-26745130 26745310 27143650 27145630 27146350
-27341650 27345610 27346150 27413650 27415630
-27416350 27451630 27453610 27456130 27456310
-27461350 27463150 27465130 27465310 27541630
-27543610 27546130 27546310 27641350 27643150
-27645130 27645310 42153670 42156370 42156730
-42157630 42163750 42165370 42165730 42167350
-42173650 42175630 42176350 42315670 42316750
-42317650 42351670 42356170 42356710 42357610
-42361750 42365170 42365710 42367150 42371650
-42375610 42376150 42513670 42516370 42516730
-42517630 42561370 42561730 42563170 42563710
-42567130 42567310 42571630 42573610 42576130
-42576310 42613750 42615370 42615730 42617350
-42651370 42651730 42653170 42653710 42657130
-42657310 42671350 42673150 42675130 42675310
-42713650 42715630 42716350 42751630 42753610
-42756130 42756310 42761350 42763150 42765130
-42765310 43156702 43157602 43165702 43175602
-43516702 43517602 43561702 43567102 43571602
-43576102 43615702 43651702 43657102 43675102
-43715602 43751602 43756102 43765102 45163702
-45167302 45173602 45176302 45316702 45317602
-45361702 45367102 45371602 45376102 45613702
-45617302 45671302 45673102 45713602 45716302
-45761302 45763102 46153702 46157302 46175302
-46315702 46351702 46357102 46375102 46513702
-46517302 46571302 46573102 46715302 46751302
-46753102 47153602 47156302 47165302 47315602
-47351602 47356102 47365102 47513602 47516302
-47561302 47563102 47615302 47651302 47653102
-62143750 62145370 62145730 62147350 62341750
-62345170 62345710 62347150 62413750 62415370
-62415730 62417350 62451370 62451730 62453170
-62453710 62457130 62457310 62471350 62473150
-62475130 62475310 62541370 62541730 62543170
-62543710 62547130 62547310 62741350 62743150
-62745130 62745310 63145702 63415702 63451702
-63457102 63475102 63541702 63547102 63745102
-64153702 64157302 64175302 64315702 64351702
-64357102 64375102 64513702 64517302 64571302
-64573102 64715302 64751302 64753102 65143702
-65147302 65341702 65347102 65413702 65417302
-65471302 65473102 65741302 65743102 67145302
-67345102 67415302 67451302 67453102 67541302
-67543102 72143650 72145630 72146350 72341650
-72345610 72346150 72413650 72415630 72416350
-72451630 72453610 72456130 72456310 72461350
-72463150 72465130 72465310 72541630 72543610
-72546130 72546310 72641350 72643150 72645130
-72645310 73145602 73415602 73451602 73456102
-73465102 73541602 73546102 73645102 74153602
-74156302 74165302 74315602 74351602 74356102
-74365102 74513602 74516302 74561302 74563102
-74615302 74651302 74653102 75143602 75146302
-75341602 75346102 75413602 75416302 75461302
-75463102 75641302 75643102 76145302 76345102
-76415302 76451302 76453102 76541302 76543102
+02345716 02346751 02347615 02356714
+02357641 02365174 02456173 02465713
+02475136 02475631 02541673 02561743
+02675134 02741635 02765143 03425671
+03451672 03456712 03457216 03546172
+03571426 03645712 03745621 04315672
+04352671 05346271 05367412 05467123
+05476132 05617243 05641273 05671234
+06345721 06375124 06715324 06745321
+07342615 07345612 07352641 07615234
+10345276 10345672 10345726 10346275
+10346752 10347625 10352674 10365472
+10425673 10546372 12340675 12346750
+12347605 12356704 12357640 12365074
+12403756 12456073 12465703 12475630
+12540673 12675034 13425670 13450672
+13546072 13645702 13745620 14305672
+14352670 15346270 16302475 16340275
+16345720 17302645 17305642 17340625
+17340652 17345602 20145673 20145736
+20146375 20153674 23045671 23045716
+23046175 23051674 23105674 23145076
+23145670 23146705 23146750 23147605
+23147650 23156704 23156740 23157604
+23157640 23165074 23165470 23405671
+23451670 23546170 23645710 23745601
+24015673 24150673 24153670 24156073
+24156370 24163750 24165703 24165730
+24173605 24175603 24175630 24315670
+25046371 25140673 25143670 25146073
+25146370 25167340 25167403 25176304
+25176430 26140753 26145703 26145730
+26157043 26157430 26175034 26175340
+27140635 27145603 27145630 27156034
+27156403 27165043 27165304 30415672
+30415726 30416275 30512674 32015674
+32405671 32405716 32406175 32415076
+32415670 32416705 32416750 32417605
+32417650 32501674 32516704 32516740
+32517604 32517640 32615074 32615470
+34025671 34025716 34026175 34105672
+34125670 34125706 34126075 34510672
+34512670 34516072 34516270 34520671
+34526071 34526170 34612750 34615702
+34620751 34625701 34625710 34712605
+34715620 34720615 34725601 34725610
+35021674 35120674 35410672 35416072
+35416270 35420671 35421670 35426071
+35617240 35617402 35627041 35627410
+35716204 35716420 35726014 35726401
+36410752 36415702 36415720 36421750
+36425701 36517042 36517420 36527140
+36715024 37415602 37415620 37420651
+37425610 40351672 40351726 40361275
+40521673 40523671 42051673 42053671
+42350671 42350716 42351670 42360175
+42361750 42371605 42503671 42503716
+42510673 42513670 42513706 42561073
+42561703 42563701 42563710 42571630
+42573601 42573610 42603175 42613075
+42651073 42653071 42653170 43052671
+43052716 43062175 43150672 43152670
+43152706 43162075 43501672 43502671
+43521670 43561072 43562071 43562170
+43651702 43652701 43652710 43751620
+43752601 43752610 45012673 45013672
+45102673 45103672 45123670 45301672
+45302671 45312670 45361072 45361270
+45362071 46351702 46351720 46352701
+47351602 47351620 47352610 50346172
+50347126 50362174 50362471 50426173
+50426371 52046173 52046371 52067341
+52346071 52346170 52347016 52360471
+52361074 52361470 52367140 52367401
+52367410 52370416 52371406 52376104
+52376401 52376410 52406371 52407316
+52416073 52416370 52417306 52467103
+52467301 52467310 52476130 52476301
+52476310 52601374 52601473 52610374
+52610473 52613470 52640173 52640371
+52641370 53046271 53061472 53146072
+53146270 53147206 53160274 53162470
+53406172 53406271 53426170 53460172
+53460271 53461270 53647102 53647201
+53647210 53746120 53746201 53746210
+54016372 54106273 54126370 54306172
+54306271 54316270 54360172 54360271
+54362170 56347102 56347120 56347201
+57346102 57346120 57346210 60345712
+60347251 60352741 60425731 62045713
+62045731 62307451 62340751 62341750
+62345701 62345710 62347051 62347105
+62347150 62350741 62351704 62351740
+62357041 62357140 62357410 62370154
+62371045 62371450 62375014 62375041
+62375140 62405731 62407153 62415703
+62415730 62417035 62417350 62457013
+62457031 62457130 62475031 62475130
+62475310 62501743 62510734 62513740
+62540713 62540731 62541730 63045721
+63047152 63051742 63145702 63145720
+63147025 63147250 63150724 63152740
+63405712 63405721 63425710 63450712
+63450721 63451720 63457012 63547012
+63547021 63547120 63745021 63745120
+63745210 64015732 64105723 64305712
+64305721 64315720 64350712 64350721
+64352710 65347012 65347021 65347210
+67345012 67345120 67345210 70345126
+70345621 70346215 70352614 70425613
+72045613 72045631 72340615 72341605
+72345016 72345106 72345601 72345610
+72346015 72346105 72346150 72350416
+72350614 72351604 72356014 72356104
+72356401 72360145 72361054 72365014
+72365041 72365104 72405316 72405613
+72406135 72415603 72416053 72456013
+72456031 72456103 72465013 72465103
+72465301 72501634 72510643 72540613
+72540631 72541603 73045216 73045612
+73046125 73051624 73145602 73146052
+73150642 73405612 73405621 73425601
+73450612 73450621 73451602 73456012
+73546012 73546021 73546102 73645012
+73645102 73645201 74015623 74105632
+74305612 74305621 74315602 74350612
+74350621 74352601 75346012 75346021
+75346201 76345021 76345102 76345201
 ```
 
-### D. HashWX algorithm pseudocode
+### E. HashWX algorithm pseudocode
 
 ```
 function hashwx_execute(self, nonce):
@@ -483,6 +548,7 @@ function hashwx_execute(self, nonce):
     vm.r[8] = ((vm.r[0] ^ vm.r[4]) & -8) | 3
     vm.mf = 0
     vm.sp = 16384
+    store64(vm.sp, vm.r[8])
     for i in [0..3]:
         vm.bc = 32
         for j in [0..31]:
@@ -498,3 +564,31 @@ function hashwx_execute(self, nonce):
     vm.r[4], vm.r[5], vm.r[6], vm.r[7] = sipround(vm.r[4], vm.r[5], vm.r[6], vm.r[7])
     return vm.r[3] ^ vm.r[7] ^ vm.r[8]
 ```
+
+### F. Test vectors
+
+Each test vector consists of a seed value (32 bytes in hex format) to generate a hash function, a nonce value (base 10 number) and the resulting hash value (base 16 number).
+
+#### F.1 Test1
+
+- seed: `5468697320697320612074657374207365656420666f72206861736877780000`
+- nonce: `0`
+- result: `0x87e339f611b4ac47`
+
+#### F.2 Test2
+
+- seed: `5468697320697320612074657374207365656420666f72206861736877780000`
+- nonce: `123456`
+- result: `0xbc929552358c5ea3`
+
+#### F.3 Test3
+
+- seed: `4c6f72656d20697073756d20646f6c6f722073697420616d6574000000000000`
+- nonce: `123456`
+- result: `0x4d3049e542f21745`
+
+#### F.4 Test4
+
+- seed: `4c6f72656d20697073756d20646f6c6f722073697420616d6574000000000000`
+- nonce: `987654321123456789`
+- result: `0xc93ca6d20a3f3104`

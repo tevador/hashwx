@@ -16,11 +16,12 @@
 #define HASHWX_NUM_REPEATS 4
 #define HASHWX_BRANCH_COUNT 32
 #define HASHWX_REG_SIZE 9
-#define HASHWX_MEM_SIZE 16384
-#define HASHWX_MEM_WORDS (HASHWX_MEM_SIZE / 8)
+#define HASHWX_WRITABLE_SIZE 16384
+#define HASHWX_MEM_TAIL 8
+#define HASHWX_MEM_WORDS ((HASHWX_WRITABLE_SIZE + HASHWX_MEM_TAIL) / 8)
 
 static_assert(HASHWX_NUM_REPEATS * (HASHWX_NUM_PROGRAMS + HASHWX_BRANCH_COUNT) * 64
-               == HASHWX_MEM_SIZE, "STORE count must exactly fill VM memory");
+               == HASHWX_WRITABLE_SIZE, "STORE count must write exactly HASHWX_WRITABLE_SIZE bytes");
 
 typedef struct hashwx_program {
     instruction code[HASHWX_PROGRAM_SIZE];

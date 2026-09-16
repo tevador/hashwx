@@ -57,11 +57,12 @@ static const uint8_t code_prologue[] = {
     0x4c, 0x8b, 0x79, 0x38, /* mov r15, qword ptr [rcx+56] */
     0x48, 0x8b, 0x71, 0x40, /* mov rsi, qword ptr [rcx+64] */
     0x31, 0xdb, /* xor ebx, ebx */
-    0x8d, 0x6b, 0x01 /* lea ebp, [rbx+1] */
+    0x8d, 0x6b, 0x01, /* lea ebp, [rbx+1] */
+    0x56 /* push rsi */
 };
 
 static const uint8_t code_epilogue[] = {
-    0x48, 0x81, 0xc4, 0x00, 0x40, 0x00, 0x00, /* add rsp, 16384 */
+    0x48, 0x81, 0xc4, 0x08, 0x40, 0x00, 0x00, /* add rsp, 16392 */
     0x4c, 0x89, 0x01, /* mov qword ptr [rcx], r8 */
     0x4c, 0x89, 0x49, 0x08, /* mov qword ptr [rcx+8], r9 */
     0x4c, 0x89, 0x51, 0x10, /* mov qword ptr [rcx+16], r10 */
@@ -111,7 +112,7 @@ static const uint8_t code_store[] = {
 };
 
 static const uint8_t code_address[] = {
-    0x25, 0xf8, 0x3f, 0x00, 0x00 /* and eax, 16376 */
+    0x25, 0xff, 0x3f, 0x00, 0x00 /* and eax, 16383 */
 };
 
 static const uint8_t code_clear_bc[] = {
@@ -316,7 +317,7 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
             pos = emit_op_reg_4c(pos, 0xc089, 0, instr->src);
             /* or/xor/add dst, imm */
             pos = emit_op_imm(pos, tpl_mul[opcode], instr->dst, instr->imm);
-            /* and eax, 16376 */
+            /* and eax, 16383 */
             EMIT(pos, code_address);
             /* imul dst, qword ptr [rsp+rax] */
             pos = emit_imul_mem(pos, instr->dst);
@@ -347,7 +348,7 @@ static uint8_t* compile_program_mem(const hashwx_program* program, uint8_t* pos)
             pos = emit_op_reg_4c(pos, 0xc089, 0, instr->src);
             /* ror/sar/shr dst, imm */
             pos = emit_op_imm(pos, tpl_pre_xas[opcode / 3], instr->dst, instr->imm);
-            /* and eax, 16376 */
+            /* and eax, 16383 */
             EMIT(pos, code_address);
             /* xor/add/sub dst, qword ptr [rsp+rax] */
             pos = emit_op_mem(pos, tpl_xas_mem[opcode % 3], instr->dst);
