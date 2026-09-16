@@ -24,7 +24,8 @@
 
 #define WASM_BINARY_MAGIC 0x00, 0x61, 0x73, 0x6d
 #define WASM_BINARY_VERSION 0x01, 0x00, 0x00, 0x00
-#define ALIGN 3
+#define ALIGN_8 3
+#define ALIGN_1 0
 
 #define PAR_RP 0x00 /* function parameter $rp (reg ptr) */
 #define PAR_MP 0x01 /* function parameter $mp (mem ptr) */
@@ -90,47 +91,48 @@ static const uint8_t code_prologue[] = {
     0x07, 0x08, 0x01,
     0x04, 'e', 'x', 'e', 'c', 0x00, 0x00,
     /* Section Code */
-    0x0a, 0xfa, 0xd7, 0x00 /*11258*/, 1,
-    0xf6, 0xd7, 0x00 /*11254*/, 1, 13, TYPE_I64,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN,  0, OP_SET, LOC_R0,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN,  8, OP_SET, LOC_R1,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN, 16, OP_SET, LOC_R2,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN, 24, OP_SET, LOC_R3,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN, 32, OP_SET, LOC_R4,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN, 40, OP_SET, LOC_R5,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN, 48, OP_SET, LOC_R6,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN, 56, OP_SET, LOC_R7,
-    OP_GET, PAR_RP, OP_LOAD, ALIGN, 64, OP_SET, LOC_R8,
+    0x0a, 0x81, 0xd8, 0x00 /*11265*/, 1,
+    0xfd, 0xd7, 0x00 /*11261*/, 1, 13, TYPE_I64,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN_8,  0, OP_SET, LOC_R0,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN_8,  8, OP_SET, LOC_R1,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN_8, 16, OP_SET, LOC_R2,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN_8, 24, OP_SET, LOC_R3,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN_8, 32, OP_SET, LOC_R4,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN_8, 40, OP_SET, LOC_R5,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN_8, 48, OP_SET, LOC_R6,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN_8, 56, OP_SET, LOC_R7,
+    OP_GET, PAR_RP, OP_LOAD, ALIGN_8, 64, OP_SET, LOC_R8,
     OP_CONST_64, 0, OP_SET, LOC_BC,
-    OP_CONST_64, 0xf8, 0xff, 0x00 /*16376*/, OP_SET, LOC_MM,
-    OP_CONST_32, 0x80, 0x80, 0x01 /*16384*/, OP_GET, PAR_MP, OP_ADD_32, OP_SET, PAR_MP
+    OP_CONST_64, 0xff, 0xff, 0x00 /*16383*/, OP_SET, LOC_MM,
+    OP_CONST_32, 0x80, 0x80, 0x01 /*16384*/, OP_GET, PAR_MP, OP_ADD_32, OP_SET, PAR_MP,
+    OP_GET, PAR_MP, OP_GET, LOC_R8, OP_STORE, ALIGN_8, 0   /* store64(16384, R8) */
 };
 
 static const uint8_t code_epilogue[] = {
     OP_GET, PAR_RP,
     OP_GET, LOC_R0,
-    OP_STORE, ALIGN, 0,
+    OP_STORE, ALIGN_8, 0,
     OP_GET, PAR_RP,
     OP_GET, LOC_R1,
-    OP_STORE, ALIGN, 8,
+    OP_STORE, ALIGN_8, 8,
     OP_GET, PAR_RP,
     OP_GET, LOC_R2,
-    OP_STORE, ALIGN, 16,
+    OP_STORE, ALIGN_8, 16,
     OP_GET, PAR_RP,
     OP_GET, LOC_R3,
-    OP_STORE, ALIGN, 24,
+    OP_STORE, ALIGN_8, 24,
     OP_GET, PAR_RP,
     OP_GET, LOC_R4,
-    OP_STORE, ALIGN, 32,
+    OP_STORE, ALIGN_8, 32,
     OP_GET, PAR_RP,
     OP_GET, LOC_R5,
-    OP_STORE, ALIGN, 40,
+    OP_STORE, ALIGN_8, 40,
     OP_GET, PAR_RP,
     OP_GET, LOC_R6,
-    OP_STORE, ALIGN, 48,
+    OP_STORE, ALIGN_8, 48,
     OP_GET, PAR_RP,
     OP_GET, LOC_R7,
-    OP_STORE, ALIGN, 56,
+    OP_STORE, ALIGN_8, 56,
     OP_END
 };
 
@@ -180,28 +182,28 @@ static const uint8_t code_store[] = {
     OP_SET, PAR_MP, /* local.set $mp */
     OP_GET, PAR_MP, /* local.get $mp */
     OP_GET, LOC_R0, /* local.get $r0 */
-    OP_STORE, ALIGN, 56, /* i64.store align, 56 */
+    OP_STORE, ALIGN_8, 56, /* i64.store align, 56 */
     OP_GET, PAR_MP, /* local.get $mp */
     OP_GET, LOC_R1, /* local.get $r1 */
-    OP_STORE, ALIGN, 48, /* i64.store align, 48 */
+    OP_STORE, ALIGN_8, 48, /* i64.store align, 48 */
     OP_GET, PAR_MP, /* local.get $mp */
     OP_GET, LOC_R2, /* local.get $r2 */
-    OP_STORE, ALIGN, 40, /* i64.store align, 40 */
+    OP_STORE, ALIGN_8, 40, /* i64.store align, 40 */
     OP_GET, PAR_MP, /* local.get $mp */
     OP_GET, LOC_R3, /* local.get $r3 */
-    OP_STORE, ALIGN, 32, /* i64.store align, 32 */
+    OP_STORE, ALIGN_8, 32, /* i64.store align, 32 */
     OP_GET, PAR_MP, /* local.get $mp */
     OP_GET, LOC_R4, /* local.get $r4 */
-    OP_STORE, ALIGN, 24, /* i64.store align, 24 */
+    OP_STORE, ALIGN_8, 24, /* i64.store align, 24 */
     OP_GET, PAR_MP, /* local.get $mp */
     OP_GET, LOC_R5, /* local.get $r5 */
-    OP_STORE, ALIGN, 16, /* i64.store align, 16 */
+    OP_STORE, ALIGN_8, 16, /* i64.store align, 16 */
     OP_GET, PAR_MP, /* local.get $mp */
     OP_GET, LOC_R6, /* local.get $r6 */
-    OP_STORE, ALIGN, 8, /* i64.store align, 8 */
+    OP_STORE, ALIGN_8, 8, /* i64.store align, 8 */
     OP_GET, PAR_MP, /* local.get $mp */
     OP_GET, LOC_R7, /* local.get $r7 */
-    OP_STORE, ALIGN, 0, /* i64.store align, 0 */
+    OP_STORE, ALIGN_8, 0, /* i64.store align, 0 */
 };
 
 static const uint8_t code_branch[] = {
@@ -383,7 +385,7 @@ static uint8_t* emit_mem_src(uint8_t* pos, uint32_t src) {
     EMIT_BYTE(pos, PAR_MP);
     EMIT_BYTE(pos, OP_ADD_32); /* i32.add */
     EMIT_BYTE(pos, OP_LOAD); /* i64.load align, 0 */
-    EMIT_BYTE(pos, ALIGN);
+    EMIT_BYTE(pos, ALIGN_1);
     EMIT_BYTE(pos, 0);
     return pos;
 }
