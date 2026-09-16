@@ -80,7 +80,7 @@ These countermeasures make JIT-compiled GPU implementations unviable. For the se
 
 For the browser-friendly variant of HashWX, it is recommended to use 65536 nonces per hash function due to higher compilation overhead. This makes the protocol somewhat more susceptible to JIT compiled GPU kernels, but the divergent branching still makes it more GPU resistant than the old HashX algorithm.
 
-The table below lists the main features of HashWX that make it GPU resistant. For each feature, the table shows if it reduces the GPU/CPU performance ratio (:white_check_mark:) or not (:x:).
+The table below lists the main features of HashWX that make it GPU resistant. For each feature, the table shows if it reduces the GPU/CPU performance ratio :white_check_mark: or not :x:.
 
 | HashWX feature | slower GPU (interpreted) | slower GPU (JIT compiled) |
 |-----------------|-------------------|-----------|
