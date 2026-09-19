@@ -53,9 +53,9 @@ The benchmark results below compare the performance of AMD Ryzen 3700X with the 
 
 | Hardware | Power limit | Build | Threads | `--nonces 463` | `--nonces 65536` |
 |----------|-------------|-------|---------|----------------|------------------|
-| Ryzen 3700X | 88 W     | native| 16      | 4.58 MH/s      | 4.72 MH/s        |
-| Ryzen 3700X | 88 W     | wasm  | 16      | 0.77 MH/s      | 2.78 MH/s        |
-| RTX 5060 Ti | 180 W    | cuda  | 63x32   | 5.35 MH/s      | 5.48 MH/s        |
+| Ryzen 3700X | 88 W     | native| 16      | 4.5 MH/s       | 4.6 MH/s         |
+| Ryzen 3700X | 88 W     | wasm  | 16      | 0.8 MH/s       | 2.8 MH/s         |
+| RTX 5060 Ti | 180 W    | cuda  | 63x32   | 5.6 MH/s       | 5.7 MH/s        |
 
 The Ryzen 3700X CPU has a stock power limit of 88 W (despite its advertised TDP of 65 W). The GPU has a stock power limit of 180 W.
 
