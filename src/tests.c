@@ -25,10 +25,10 @@ static const uint64_t counter1 = 0;
 static const uint64_t counter2 = 123456;
 static const uint64_t counter3 = 987654321123456789;
 
-static const uint64_t hash1 = 0x87e339f611b4ac47;
-static const uint64_t hash2 = 0xbc929552358c5ea3;
-static const uint64_t hash3 = 0x4d3049e542f21745;
-static const uint64_t hash4 = 0xc93ca6d20a3f3104;
+static const uint64_t hash1 = 0x1af53247be2cfe67;
+static const uint64_t hash2 = 0xe3545019a837ebba;
+static const uint64_t hash3 = 0xc04b99e6001bd636;
+static const uint64_t hash4 = 0x3f07bf678615b8fa;
 
 #define RUN_TEST(x) run_test(#x, &x)
 
