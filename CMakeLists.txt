@@ -61,12 +61,41 @@ if (NOT DEFINED EMSCRIPTEN)
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 else()
   # hashwx.wasm to be called from javascript
+  # only WebAssembly 1.0 (MVP) features are allowed
   add_executable(hashwx ${hashwx_sources})
   include_directories(hashwx
     include/)
-  set_target_properties(hashwx PROPERTIES COMPILE_FLAGS ""
-                                          LINK_FLAGS "-s MALLOC=emmalloc -s ABORTING_MALLOC=0 -s EXPORTED_FUNCTIONS=['_hashwx_alloc','_hashwx_make','_hashwx_exec','_hashwx_free','_hashwx_seed','_hashwx_registers','_hashwx_memory','_hashwx_module','_hashwx_module_size','_hashwx_exec_begin','_hashwx_exec_final'] --no-entry"
+  set_target_properties(hashwx PROPERTIES COMPILE_FLAGS "-mno-bulk-memory -mno-sign-ext"
+                                          LINK_FLAGS "-mno-bulk-memory -mno-sign-ext -s MALLOC=emmalloc -s ABORTING_MALLOC=0 -s EXPORTED_FUNCTIONS=['_hashwx_alloc','_hashwx_make','_hashwx_exec','_hashwx_free','_hashwx_seed','_hashwx_registers','_hashwx_memory','_hashwx_module','_hashwx_module_size','_hashwx_exec_begin','_hashwx_exec_final'] --no-entry"
                                           SUFFIX ".wasm")
+  # try to find wasm-opt
+  get_filename_component(HASHWX_EMSCRIPTEN_DIR "${CMAKE_C_COMPILER}" DIRECTORY)
+  find_program(HASHWX_EM_CONFIG NAMES em-config em-config.bat em-config.py
+    PATHS "${HASHWX_EMSCRIPTEN_DIR}" NO_DEFAULT_PATH)
+  if (NOT HASHWX_EM_CONFIG)
+    message(FATAL_ERROR "Could not find em-config next to ${CMAKE_C_COMPILER}")
+  endif()
+  execute_process(
+    COMMAND "${HASHWX_EM_CONFIG}" BINARYEN_ROOT
+    OUTPUT_VARIABLE HASHWX_BINARYEN_ROOT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE HASHWX_EM_CONFIG_RESULT)
+  if (NOT HASHWX_EM_CONFIG_RESULT EQUAL 0)
+    message(FATAL_ERROR "'${HASHWX_EM_CONFIG} BINARYEN_ROOT' failed")
+  endif()
+  find_program(HASHWX_WASM_OPT NAMES wasm-opt
+    PATHS "${HASHWX_BINARYEN_ROOT}/bin" NO_DEFAULT_PATH)
+  if (NOT HASHWX_WASM_OPT)
+    message(FATAL_ERROR "Could not find wasm-opt in ${HASHWX_BINARYEN_ROOT}/bin")
+  endif()
+  # lower any bulk-memory/sign-ext instructions
+  add_custom_command(TARGET hashwx POST_BUILD
+    COMMAND "${HASHWX_WASM_OPT}" "$<TARGET_FILE:hashwx>"
+            --enable-bulk-memory --enable-bulk-memory-opt --enable-sign-ext
+            --llvm-memory-copy-fill-lowering --signext-lowering
+            -o "$<TARGET_FILE:hashwx>"
+    COMMENT "Lowering hashwx.wasm to WebAssembly 1.0 (MVP)"
+    VERBATIM)
 endif()
 
 add_executable(hashwx-tests

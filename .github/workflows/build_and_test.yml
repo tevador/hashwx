@@ -139,5 +139,6 @@ jobs:
             bash -c "
               emcmake cmake -S . -B build &&
               cmake --build build &&
-              node build/hashwx-tests.js
+              node build/hashwx-tests.js &&
+              \$EMSDK/upstream/bin/wasm-opt --mvp-features build/hashwx.wasm -o /dev/null
             "
