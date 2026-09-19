@@ -146,7 +146,7 @@ if (NOT DEFINED EMSCRIPTEN)
   find_library(PROBDIST_LIB NAMES libprobdist.a)
   find_library(MYLIB_LIB NAMES libmylib.a)
 
-  if(TESTU01_LIB)
+  if(TESTU01_LIB AND PROBDIST_LIB AND MYLIB_LIB)
     add_executable(hashwx-crush
       src/crush.c)
     include_directories(hashwx-crush

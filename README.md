@@ -85,7 +85,7 @@ cmake ..
 make
 ```
 
-To run HashWX in the browser, install Emscripten and use `emcmake cmake ..` instead of `cmake ..`. The build produces the `hashwx.wasm` module, a `hashwx-bench.js` executable and a `hashwx-tests.js` executable.
+To run HashWX in the browser, install Emscripten and use `emcmake cmake ..` instead of `cmake ..`. The build produces the `hashwx.wasm` module, a `hashwx-bench.js` executable and a `hashwx-tests.js` executable. The `hashwx.wasm` module is built for WebAssembly 1.0.
 
 ## API
 
