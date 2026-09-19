@@ -182,7 +182,7 @@ The main program body (indexes 2-8) consists of 7 arithmetic instructions, which
 
 ### 2.3 Program generation
 
-Each random program is generated from 16 pseudorandom 64-bit numbers output from the Siphash generator. In this section, these 16 numbers are referred to as `gen[0]` to `gen[15]`.
+Each random program is generated from 16 pseudorandom 64-bit numbers output from the Siphash generator. In this section, these 16 numbers are referred to as `gen[0]` to `gen[15]`. Additionally, the generator is parametrized by two boolean flags - `is_last` (if the program is the last one in the list) and `is_deep` (if the program should use a deep source permutation).
 
 #### 2.3.1 Opcode template
 
@@ -218,7 +218,7 @@ If the i-th position in the opcode template is a MUL instruction (marked as "M" 
 |1|MULXOR|
 |2|MULADD|
 
-The opcode for the branch instruction at index 9 is not selected at random. The first 31 programs always use the CBRANCH instruction. The last program uses UBRANCH to ensure that the value of BC is zero at the end.
+The opcode for the branch instruction at index 9 is CBRANCH if `is_last` is false. If `is_last` is true, the program uses UBRANCH to ensure that the value of BC is zero at the end.
 
 #### 2.3.3 Destinations
 
@@ -226,13 +226,17 @@ A total of 8 instructions in each program need a destination register (indexes 1
 
 #### 2.3.4 Sources
 
-The 7 instructions from the opcode template also need a source register. These sources are selected as one of 128 permitted permutations of the destinations. The source permutation index is calculated as `gen[7] % 128`. The permitted source permutations are listed in Appendix D. 
+The 7 instructions from the opcode template also need a source register. These sources are selected as one of the permitted permutations of the destinations.
+
+If `is_deep` is false, the source permutation index is calculated as `gen[7] % 256` and the permutation is selected from the shallow list in Appendix D.1. The 256 shallow permutations produce 3 memory load dependency chains of depth 2.
+
+If `is_deep` is true, the source permutation index is calculated as `gen[7] % 24` and the permutation is selected from the deep list in Appendix D.2. The 24 deep permutations produce a memory load dependency chain of depth 6.
 
 The source permutation is a permutation of the destinations, so it needs to be combined with the destination permutation to get actual register indexes, i.e. `src[i] = dst[1+perm[i-1]]` for instruction index `i = 2..8` and the selected permutation `perm`.
 
 The RMCG instruction at index 1 always takes R8 as its source operand.
 
-Note: The generator output `gen[7]` is used twice (in § 2.3.1 and here). The resulting random values are independent because `gcd(35,128) = 1`.
+Note: The generator output `gen[7]` is used twice (in § 2.3.1 and here). The resulting random values are independent because `gcd(35,256) = 1` and `gcd(35,24) = 1`.
 
 #### 2.3.5 Immediates
 
@@ -245,6 +249,14 @@ A total of 8 instructions in each program need an immediate value (indexes 1-8).
 | 0-2               |`{1,9,33}[gen[7+i] % 3]`|
 |3-6                |`1 + (gen[7+i] % 63)`|
 |7-12               |`1 + (gen[7+i] % 3)`|
+
+### 2.4 Program list
+
+The 32 programs are generated in sequence (program 0, program 1, ..., program 31) using the same shared instance of Siphash generator.
+
+Only the last program at index 31 is generated with the `is_last` flag set to true.
+
+Only the programs at indexes 0, 6, 12, 18, 24 and 30 are generated with the `is_deep` flag set to true. There are always 6 "deep" programs and 26 "shallow" programs. Deep programs use a different source register selection method (see § 2.3.4).
 
 ## 3. HashWX calculation
 
@@ -402,43 +414,92 @@ function fisher_yates_shuffle(rnd)
 
 ### D. Source permutations
 
-The permitted 128 source permutations are listed below (lexicographically sorted). The first element of the permutation is unused as there are only 7 source registers per program. The source permutation is a permutation of the destinations, so it needs to be combined with the destination permutation to get actual register indexes.
+The permitted source permutations are listed below. They are lexicographically sorted and separated into 2 lists. The first element of each permutation is unused as there are only 7 source registers per program. The source permutation is a permutation of the destinations, so it needs to be combined with the destination permutation to get actual register indexes.
 
 No permutation uses its own destination as its source, i.e. `perm[i] != i` for all `i = 1..7`.
 
+#### D.1 Shallow permutations
+
+The 256 shallow permutations produce 3 memory load dependency chains of depth 2.
+
 ```
-02345671 02375614 02451673 02713456
-03172456 03456712 03567214 04127356
-04567123 04576132 05123746 06123475
-06541372 10326745 10576342 10675234
-10723456 10742635 10765324 12576304
-13056742 14672035 14675230 16057234
-16057324 16357042 16705234 17023456
-17065234 17506234 17506324 17642053
-20675341 20713456 20741653 23457601
-23615740 23645701 23657041 23675041
-24316705 24675031 25067314 25471603
-25640731 26310745 27013456 27450631
-27645013 27645031 30172456 30456271
-30657142 30741625 34016725 34026715
-34057612 34602715 34701625 34702615
-35460172 35461270 35462170 36705214
-37102456 37506124 37506214 40127356
-40752613 42361705 42576130 43012675
-43751620 45061273 45062173 45367021
-45367102 46075231 46302751 46312705
-46315702 47120356 47506213 50123746
-52460173 52461073 52461370 52461730
-52706314 53017642 53412670 53641270
-54062371 54372601 54673120 56317042
-56407312 56740123 57123046 60123475
-62315704 62450371 62570143 62743015
-63517402 63517420 64571230 65740123
-65740213 65740312 67123405 67123450
-67350142 67540123 72013456 72451306
-72451603 73102456 73456021 74120356
-74560132 75123046 75316024 75641203
-75641230 76123405 76123450 76305124
+02143675 03416752 04567123 06375214
+10452376 13025476 13520476 13627054
+13720645 13720654 13725406 13726054
+14503276 14572306 14603725 14672035
+14672053 14702653 14703625 14752306
+14753206 14763052 15670234 15670243
+15706234 15706243 15760324 15760423
+16472053 16570243 17320654 17326045
+17326054 17462035 17463052 17506234
+17506243 17560234 17560243 17605243
+17642053 17643052 17650234 20463715
+23017645 23106745 23170645 23170654
+24071653 24173650 24571306 24573106
+24671035 24753106 25067341 25167034
+25167304 25170634 25176034 25607134
+25670134 25760143 25760314 25760341
+25760413 26157304 26157403 26157430
+26175340 26175430 27105643 27143605
+27143650 27150643 27156034 27156304
+27156340 27165304 27165403 27310654
+27650341 30416725 30426751 30526741
+30615472 32016745 32017645 32105476
+32106745 32107654 32157406 32160754
+32716045 32716054 34071652 34617025
+34627051 34672051 34720651 35076421
+35607124 35627041 35670124 35670241
+35670421 35716042 35726014 35760124
+36507124 36705421 36715402 37412650
+37516042 37516402 37615042 37615240
+37615402 40321675 40326715 42051376
+42063715 42063751 42103675 42107635
+42153076 42176053 42673015 42703615
+42751306 43012675 43016752 43025176
+43026715 43027615 43027651 43062715
+43527106 43572106 43602715 43620751
+43627015 43627051 45061732 45302176
+45317206 45327106 45372106 46320715
+46327015 46371052 46751230 47301625
+47302651 47561203 50326471 50341276
+50342176 50461273 50461732 50463721
+50473612 50742631 52041376 52043176
+52067341 52067413 52106734 52317406
+52403176 52743106 52760341 53026741
+53402176 53420176 53741206 53742106
+54062713 54063172 54302176 54317206
+54607123 54607132 54761320 56041723
+56043712 56043721 56402713 56403721
+56741203 60315472 60315724 60325471
+60375412 60451273 60451372 60451723
+60451732 60452371 60452731 60475312
+60475321 60541273 60542173 60542731
+60543172 60543271 60745312 62043751
+62157340 62403715 63015472 63527401
+64317025 64502371 64571230 64571320
+64572130 65042173 65047321 67315204
+67315402 67315420 67541230 70452613
+70543612 72143650 72165340 72165430
+72560134 73415206 73516420 73526410
+73615402 73650412 74651023 74651230
+75041623 75316240 75316420 75326140
+76045213 76045312 76305412 76315420
+76325410 76451032 76451230 76451320
+76452130 76452310 76453120 76453210
+76540312 76541230 76541320 76542130
+```
+
+#### D.2 Deep permutations
+
+The 24 deep permutations produce a memory load dependency chain of depth 6.
+
+```
+02713456 03172456 04127356 05123746
+06123475 10723456 17023456 20713456
+27013456 30172456 37102456 40127356
+47120356 50123746 57123046 60123475
+67123405 67123450 72013456 73102456
+74120356 75123046 76123405 76123450
 ```
 
 ### E. HashWX algorithm pseudocode
