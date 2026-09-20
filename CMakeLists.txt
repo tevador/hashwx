@@ -138,7 +138,7 @@ else()
     set_target_properties(hashwx-bench PROPERTIES COMPILE_FLAGS "-pthread")
   endif()
   set_target_properties(hashwx-bench PROPERTIES
-    LINK_FLAGS "-pthread -s USE_PTHREADS=1 --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/js/hashwx.js --js-library ${CMAKE_CURRENT_SOURCE_DIR}/js/hashwx-em.js")
+    LINK_FLAGS "-pthread --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/js/hashwx.js --js-library ${CMAKE_CURRENT_SOURCE_DIR}/js/hashwx-em.js")
 endif()
 
 if (NOT DEFINED EMSCRIPTEN)

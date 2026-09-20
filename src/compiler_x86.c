@@ -22,7 +22,7 @@
 #define EMIT_BYTE(p,x) *((p)++) = x
 
 /*
-    x86 achitectural register allocation:
+    x86 architectural register allocation:
         rax    = temporary
         rcx    = in/out ptr
         rdx    = BF, temporary

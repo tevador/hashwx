@@ -43,7 +43,7 @@ Due to divergence, GPUs (in JIT compiled mode) will have to execute the loop 6x 
 * 1 thread will loop 4x
 * 1 thread will loop 5x or more
 
-The specification is written in a way that causes all HashWX instances to always branch exactly 64 times per hash (32x in the write phase and 32x in the read phase). This is done by a combination of using a branch-counting register (BC) and inserting an unconditional branch at the last program. This property is needed to make the run time roughly constant for all hash functions and nonces.
+The specification is written in a way that causes all HashWX instances to always branch exactly 256 times per hash (4 repetitions of 32 branches in the write phases and 32 branches in the read phases). This is done by a combination of using a branch-counting register (BC) and inserting an unconditional branch at the last program. This property is needed to make the run time roughly constant for all hash functions and nonces.
 
 ### 1.3 Memory
 
@@ -53,7 +53,7 @@ CPUs will store the scratchpad in the L1 cache. The typical load latency of 3-4 
 
 GPUs will have to store the scratchpads in local memory. The scratchpads will be cached in the L2 cache, which has a much higher latency (~100 cycles) than shared memory. Shared memory will have to compete for space with the L1 cache (shared memory carveout). Most GPU architectures also don't support unaligned loads natively, so they must be emulated by combining two adjacent loads. Unaligned loads also prevent the use of scratchpad interleaving.
 
-The large latency difference between the CPU and the GPU can be exploited via forced "pointer chasing" in the memory read phase. Source registers for arithmeric instructions are selected from two lists: the "shallow" list produces 3 memory load dependency chains of depth 2 (for example R1 -> R2, R3 -> R4, R5 -> R7), while the "deep" list produces a memory load dependency chain of depth 6 (for example R1 -> R3 -> R4 -> R5 -> R6 -> R7). The lists are interleaved so that the CPU needs to handle on average 2.75 dependent loads per program. However, the GPU interpreter must specialize for the deep list because in ~95% of cases, at least one thread in a warp is running a deep program and not executing the loads sequentially would result in a read-after-write hazard. The GPU therefore gets hit with the full 6 dependent loads for every program.
+The large latency difference between the CPU and the GPU is exploited via forced "pointer chasing" in the memory read phase. Source registers for arithmetic instructions are selected from two lists: the "shallow" list produces 3 memory load dependency chains of depth 2 (for example R1 -> R2, R3 -> R4, R5 -> R7), while the "deep" list produces a memory load dependency chain of depth 6 (for example R1 -> R3 -> R4 -> R5 -> R6 -> R7). The lists are interleaved so that the CPU needs to handle on average 2.75 dependent loads. However, the GPU interpreter must specialize for the deep list because in ~95% of cases, at least one thread in a warp is executing a deep program and not executing the loads sequentially would result in a read-after-write hazard. The GPU therefore gets hit with the full 6 dependent loads for every program.
 
 ### 1.4 Instruction set
 
@@ -80,7 +80,7 @@ HashWX attempts to prevent JIT-compiled GPU kernels with 2 countermeasures:
 1. Divergent branching (see above)
 2. Limiting the number of nonces per hash function
 
-These countermeasures make JIT-compiled GPU implementations unviable. For the second point, it is specifically recommended to use 463 nonces per hash fuction. This should be taken as a protocol rule. The HashWX library does not enforce this limit. The number 463 was chosen because it maps awkwardly onto 32-thread GPU warps and is just high enough to amortize the native compilation overhead on the CPU.
+These countermeasures make JIT-compiled GPU implementations unviable. For the second point, it is specifically recommended to use 463 nonces per hash function. This should be taken as a protocol rule. The HashWX library does not enforce this limit. The number 463 was chosen because it maps awkwardly onto 32-thread GPU warps and is just high enough to amortize the native compilation overhead on the CPU.
 
 For the browser-friendly variant of HashWX, it is recommended to use 65536 nonces per hash function due to higher compilation overhead. This makes the protocol somewhat more susceptible to JIT compiled GPU kernels, but divergent branching still makes it more GPU resistant than the old HashX algorithm.
 
@@ -144,3 +144,9 @@ In general, client puzzles used for DoS protection do not need to be resistant t
 Therefore HashWX does not claim ASIC resistance as one of its properties, but it's likely that some ASIC resistance is inherited from its GPU resistant design.
 
 Using HashWX as a cryptocurrency proof-of-work consensus mechanism is not recommended because the above two points typically don't apply for that use-case. Long-term mining rewards may justify the development of specialized hardware and the algorithm cannot be easily changed once implemented.
+
+## 5. Security properties
+
+HashWX provides 64 bits of preimage resistance and the hash output is uniformly distributed on <code>[0, 2<sup>64</sup>-1]</code>. The latter property has been empirically verified - HashWX passes the SmallCrush test suite of [TestU01](https://github.com/umontreal-simul/TestU01-2009/) (with the low and high 32 bits tested separately).
+
+HashWX should not be used as a general hash function. Collision resistance was not a design goal.

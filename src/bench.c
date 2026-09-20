@@ -141,7 +141,7 @@ int main(int argc, char** argv) {
 #endif
     }
     else {
-        worker(jobs);
+        jobs[0].res = worker(jobs);
     }
     time_end = platform_wall_clock();
     int ret_val = 0;

@@ -192,11 +192,11 @@ Each HashWX program implements one of 35 possible templates of MUL and XAS opcod
 
 For each slot from the selected opcode template, an opcode needs to be selected. Opcode selection uses the low 32 bits of `gen[0]` to `gen[6]`.
 
-If the i-th position in the opcode template is a XAS instruction (marked as "X" in Appendix B), it can have one of 9 possible opcodes. The opcode is selected from the lookup table 2.3.2.1 based on the least significant 32 bits of `gen[i]`.
+If the j-th position in the opcode template is a XAS instruction (marked as "X" in Appendix B), it can have one of 9 possible opcodes. The opcode is selected from the lookup table 2.3.2.1 based on the least significant 32 bits of `gen[j]`. The index `j = 0` corresponds to the instruction index 2 from table 2.2.1.
 
 *Table 2.3.2.1 - XAS lookup table*
 
-|`(gen[i] & 0xffffffff) % 9`|opcode|
+|`(gen[j] & 0xffffffff) % 9`|opcode|
 |-----|------|
 |0|XORROR|
 |1|ADDROR|
@@ -208,11 +208,11 @@ If the i-th position in the opcode template is a XAS instruction (marked as "X" 
 |7|ADDLSR|
 |8|SUBLSR|
 
-If the i-th position in the opcode template is a MUL instruction (marked as "M" in Appendix B), it can have one of 3 possible opcodes. The opcode is selected based on the least significant 32 bits of `gen[i]` as shown in table 2.3.2.2
+If the j-th position in the opcode template is a MUL instruction (marked as "M" in Appendix B), it can have one of 3 possible opcodes. The opcode is selected based on the least significant 32 bits of `gen[j]` as shown in table 2.3.2.2
 
 *Table 2.3.2.2 - MUL lookup table*
 
-|`(gen[i] & 0xffffffff) % 3`|opcode|
+|`(gen[j] & 0xffffffff) % 3`|opcode|
 |-----|------|
 |0|MULOR|
 |1|MULXOR|
@@ -232,7 +232,7 @@ If `is_deep` is false, the source permutation index is calculated as `gen[7] % 2
 
 If `is_deep` is true, the source permutation index is calculated as `gen[7] % 24` and the permutation is selected from the deep list in Appendix D.2. The 24 deep permutations produce a memory load dependency chain of depth 6.
 
-The source permutation is a permutation of the destinations, so it needs to be combined with the destination permutation to get actual register indexes, i.e. `src[i] = dst[1+perm[i-1]]` for instruction index `i = 2..8` and the selected permutation `perm`.
+The source permutation is a permutation of the destinations, so it needs to be combined with the destination permutation to get actual register indexes, i.e. `src[j] = dst[perm[j]]` for  index `j = 1..7` and the selected permutation `perm`.
 
 The RMCG instruction at index 1 always takes R8 as its source operand.
 
@@ -538,22 +538,22 @@ Each test vector consists of a seed value (32 bytes in hex format) to generate a
 
 - seed: `5468697320697320612074657374207365656420666f72206861736877780000`
 - nonce: `0`
-- result: `0x1af53247be2cfe67`
+- result: `0x973684176f8ee362`
 
 #### F.2 Test2
 
 - seed: `5468697320697320612074657374207365656420666f72206861736877780000`
 - nonce: `123456`
-- result: `0xe3545019a837ebba`
+- result: `0x401983bb07d69b07`
 
 #### F.3 Test3
 
 - seed: `4c6f72656d20697073756d20646f6c6f722073697420616d6574000000000000`
 - nonce: `123456`
-- result: `0xc04b99e6001bd636`
+- result: `0x4af38d834a9a8d3d`
 
 #### F.4 Test4
 
 - seed: `4c6f72656d20697073756d20646f6c6f722073697420616d6574000000000000`
 - nonce: `987654321123456789`
-- result: `0x3f07bf678615b8fa`
+- result: `0x6a8a5514432e17a3`

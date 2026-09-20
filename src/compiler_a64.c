@@ -22,7 +22,7 @@
     } while (0)
 
 /*
-    aarch64 achitectural register allocation:
+    aarch64 architectural register allocation:
         x0-x7   = R0-R7
         x8      = in/out ptr
         x9      = 32-BC

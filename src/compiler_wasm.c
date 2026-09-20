@@ -40,7 +40,7 @@
 #define LOC_R8 0x0a /* VM register R8 */
 #define LOC_BC 0x0b /* VM register BC */
 #define LOC_BF 0x0c /* VM register BF */
-#define LOC_MM 0x0d /* memory mask constant (16376) */
+#define LOC_MM 0x0d /* memory mask constant (16383) */
 #define LOC_RC 0x0e /* repeat counter */
 
 #define OP_INVALID 0x00
