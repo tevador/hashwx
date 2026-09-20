@@ -36,7 +36,7 @@ class hashwx {
         if (!this.#imports) {
             let main_module = hashwx.#create_instance();
             this.#imports = main_module.exports;
-			this.#imports._initialize();
+            this.#imports._initialize();
         }
         let ctx = this.#imports.hashwx_alloc(type);
         if (ctx <= 0) {
@@ -60,8 +60,8 @@ class hashwx {
 
     hashwx_make(i, seed_src) {
         let obj = this.#instances[i];
-		let seed_dst = this.hashwx_seed_array(obj.seed);
-		seed_dst.set(seed_src);
+        let seed_dst = this.hashwx_seed_array(obj.seed);
+        seed_dst.set(seed_src);
         this.#imports.hashwx_make(obj.ctx, obj.seed);
         if (!obj.is_compiled) {
             return;
@@ -134,7 +134,7 @@ class hashwx {
                 throw new Error(`Failed to create WASM module ${filename}: ${e}`);
             }
         }
-		let imports = {};
+        let imports = {};
         return new WebAssembly.Instance(this.#hashwx_module, imports);
     }
 }
